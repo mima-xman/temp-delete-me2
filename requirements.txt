@@ -1,0 +1,12 @@
+requests
+PySocks
+stem
+playwright
+fake-useragent
+pymongo
+bytez
+python-dotenv
+camoufox[geoip]
+curl_cffi
+pyotp
+cloudscraper
