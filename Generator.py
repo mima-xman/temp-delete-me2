@@ -32,6 +32,8 @@ from config import (
     OUTPUT_DIR,
     USER_AGENT,
     VIEWPORT,
+    TOR_CONTROL_PORT,
+    TOR_PORT,
 )
 from TempMailServices.EmailOnDeck import EmailOnDeck
 from TempMailServices.TMailorAPI import TMailorAPI
@@ -81,27 +83,19 @@ class GithubTMailorGenerator:
 
     Attributes:
         use_tor: Whether to route traffic through Tor network.
-        tor_port: SOCKS proxy port for Tor (default 9150).
-        tor_control_port: Control port for Tor circuit renewal (default 9151).
     """
 
     def __init__(
         self,
-        use_tor: bool = False,
-        tor_port: int = 9150,
-        tor_control_port: int = 9151
+        use_tor: bool = False
     ):
         """
         Initialize the GitHub account generator.
 
         Args:
             use_tor: Enable Tor network for anonymity.
-            tor_port: Tor SOCKS proxy port.
-            tor_control_port: Tor control port for circuit renewal.
         """
         self.use_tor = use_tor
-        self.tor_port = int(os.getenv("TOR_PORT", tor_port))
-        self.tor_control_port = int(os.getenv("TOR_CONTROL_PORT", tor_control_port))
 
         # Browser and page instances
         self.playwright = None
@@ -128,8 +122,8 @@ class GithubTMailorGenerator:
         self.screenshot_counter = 1
 
         # Log Tor configuration
-        logger(f"TOR Port: {self.tor_port}", level=1)
-        logger(f"TOR Control Port: {self.tor_control_port}", level=1)
+        logger(f"TOR Port: {TOR_PORT}", level=1)
+        logger(f"TOR Control Port: {TOR_CONTROL_PORT}", level=1)
 
         # Create output directories with timestamp
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -143,7 +137,7 @@ class GithubTMailorGenerator:
         # Initialize Tor if enabled
         if self.use_tor:
             logger("Using TOR network for emails...", level=1)
-            success, self.ip = renew_tor(self.tor_control_port, self.tor_port, level=1)
+            success, self.ip = renew_tor(level=1)
 
     # ==========================================================================
     # Human-like Interaction Helpers
@@ -342,7 +336,7 @@ class GithubTMailorGenerator:
 
             # Configure Tor proxy if enabled
             if self.use_tor:
-                tor_proxy = f"socks5://127.0.0.1:{self.tor_port}"
+                tor_proxy = f"socks5://127.0.0.1:{TOR_PORT}"
                 launch_kwargs["proxy"] = {"server": tor_proxy}
                 logger(f"Using Tor proxy: {tor_proxy}", level=level + 1)
 
@@ -1025,7 +1019,7 @@ class GithubTMailorGenerator:
 
                 if attempt < max_retries - 1:
                     logger(f"✗ Flow failed, retrying ({attempt + 1}/{max_retries})", level=level + 1)
-                    renew_tor(self.tor_control_port, self.tor_port, level=level + 1)
+                    renew_tor(level=level + 1)
                     time.sleep(random.uniform(5, 10))
 
             except Exception as e:
@@ -1034,7 +1028,7 @@ class GithubTMailorGenerator:
                         f"✗ Flow error, retrying ({attempt + 1}/{max_retries}): {format_error(e)}",
                         level=level + 1
                     )
-                    renew_tor(self.tor_control_port, self.tor_port, level=level + 1)
+                    renew_tor(level=level + 1)
                     time.sleep(random.uniform(5, 10))
                 else:
                     logger(f"✗ Flow failed after {max_retries} attempts: {format_error(e)}", level=level + 1)

@@ -1,12 +1,16 @@
+# Core dependencies
 requests
 PySocks
-stem
 playwright
-fake-useragent
-pymongo
-bytez
 python-dotenv
-camoufox[geoip]
-curl_cffi
-pyotp
+
+# Tor network support
+stem
+
+# Email service dependencies
+fake-useragent
 cloudscraper
+curl_cffi
+
+# 2FA support
+pyotp

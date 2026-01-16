@@ -12,6 +12,8 @@ import requests
 from stem import Signal
 from stem.control import Controller
 
+from config import TOR_CONTROL_PORT, TOR_PORT
+
 
 def logger(message: str, level: int = 0) -> None:
     """
@@ -41,11 +43,7 @@ def format_error(e: Exception) -> str:
     return str(e).split("Call log:")[0].strip()
 
 
-def renew_tor(
-    tor_control_port: int = 9151,
-    tor_port: int = 9150,
-    level: int = 0
-) -> Tuple[bool, Optional[str]]:
+def renew_tor(level: int = 0) -> Tuple[bool, Optional[str]]:
     """
     Request a new Tor circuit (new IP address).
 
@@ -53,15 +51,13 @@ def renew_tor(
     a fresh exit node and IP address.
 
     Args:
-        tor_control_port: Tor control port (default 9151 for Tor Browser).
-        tor_port: Tor SOCKS proxy port (default 9150 for Tor Browser).
         level: Logging indentation level.
 
     Returns:
         A tuple of (success: bool, new_ip: str | None).
     """
     try:
-        with Controller.from_port(port=tor_control_port) as controller:
+        with Controller.from_port(port=TOR_CONTROL_PORT) as controller:
             controller.authenticate()
             controller.signal(Signal.NEWNYM)
             time.sleep(5)  # Wait for new circuit to be established
@@ -71,8 +67,8 @@ def renew_tor(
             ip: Optional[str] = None
             try:
                 tor_proxies: Dict[str, str] = {
-                    "http": f"socks5://127.0.0.1:{tor_port}",
-                    "https": f"socks5://127.0.0.1:{tor_port}"
+                    "http": f"socks5://127.0.0.1:{TOR_PORT}",
+                    "https": f"socks5://127.0.0.1:{TOR_PORT}"
                 }
                 ip = get_current_ip(proxies=tor_proxies, level=level)
             except Exception:

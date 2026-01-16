@@ -5,7 +5,18 @@ This module contains all configuration settings for GitHub account generation,
 browser settings, and output paths.
 """
 
+import os
 from typing import Dict, List
+
+# ==============================================================================
+# Tor Network Settings
+# ==============================================================================
+
+# Tor SOCKS proxy port (9150 for Tor Browser, 9050 for system Tor)
+TOR_PORT: int = int(os.getenv("TOR_PORT", 9150))
+
+# Tor control port for circuit renewal (9151 for Tor Browser, 9051 for system Tor)
+TOR_CONTROL_PORT: int = int(os.getenv("TOR_CONTROL_PORT", 9151))
 
 # ==============================================================================
 # Account Generation Settings
