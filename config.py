@@ -119,7 +119,7 @@ ARGS: List[str] = [
 
 # Browser executable paths
 BRAVE_PATH: str = r"C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe"
-CHROME_PATH: str = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
+CHROME_PATH: str = os.getenv("CHROME_PATH", r"C:\Program Files\Google\Chrome\Application\chrome.exe")
 
 # ==============================================================================
 # Output Settings

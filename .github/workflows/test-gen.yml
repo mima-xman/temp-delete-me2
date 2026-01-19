@@ -75,11 +75,15 @@ jobs:
           sed -i 's/input("Press Enter to close the browser...")/print("Browser closing automatically in CI")/g' github_generator.py
           # Force Headless to True in config.py for CI
           sed -i 's/HEADLESS = False/HEADLESS = True/g' config.py
-          # Patch Chrome Path to Linux standard location (or rely on playwright path)
-          # We use a trick: if we set CHROME_PATH to empty string or None, playwright might auto-detect if we used 'channel="chrome"'
-          # But the script uses executable_path argument.
-          # On GitHub Actions, Chrome is usually at /usr/bin/google-chrome
-          sed -i 's|CHROME_PATH = r"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"|CHROME_PATH = "/usr/bin/google-chrome"|g' config.py
+
+      - name: Ensure Chrome is installed
+        run: |
+          # Install Google Chrome Stable ensuring /usr/bin/google-chrome exists
+          wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+          sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable
+          ls -l /usr/bin/google-chrome
 
       - name: Run Python Code
         env:
@@ -88,6 +92,7 @@ jobs:
           TOR_PORT: 9150
           TOR_CONTROL_PORT: 9151
           MAX_RETRIES_FOR_GENERATE_ACCOUNT: ${{ github.event.inputs.max_retries || 1000 }}
+          CHROME_PATH: "/usr/bin/google-chrome"
           PYTHONUNBUFFERED: "1"
         run: |
           # Run with xvfb just in case, though we patched HEADLESS=True
