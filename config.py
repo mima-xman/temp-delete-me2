@@ -23,13 +23,59 @@ TOR_CONTROL_PORT: int = int(os.getenv("TOR_CONTROL_PORT", 9151))
 # ==============================================================================
 
 FIRST_NAMES: List[str] = [
-    "Liam", "Emma", "Noah", "Olivia", "William", "Ava",
-    "James", "Isabella", "Oliver", "Sophia", "Benjamin", "Mia"
+    "Liam", "Noah", "Oliver", "Elijah", "William", "James", "Benjamin", "Lucas",
+    "Henry", "Alexander", "Mason", "Michael", "Ethan", "Daniel", "Jacob", "Logan",
+    "Jackson", "Levi", "Sebastian", "Mateo", "Jack", "Owen", "Theodore", "Aiden",
+    "Samuel", "Joseph", "John", "David", "Wyatt", "Matthew", "Luke", "Asher",
+    "Carter", "Julian", "Grayson", "Leo", "Jayden", "Gabriel", "Isaac", "Lincoln",
+    "Anthony", "Hudson", "Dylan", "Ezra", "Thomas", "Charles", "Christopher",
+    "Jaxon", "Maverick", "Josiah", "Isaiah", "Andrew", "Elias", "Joshua", "Nathan",
+    "Caleb", "Ryan", "Adrian", "Miles", "Eli", "Nolan", "Christian", "Aaron",
+    "Cameron", "Ezekiel", "Colton", "Luca", "Landon", "Hunter", "Jonathan",
+    "Santiago", "Axel", "Easton", "Cooper", "Jeremiah", "Angel", "Roman", "Connor",
+    "Jameson", "Robert", "Greyson", "Jordan", "Ian", "Carson", "Jaxson", "Leonardo",
+    "Nicholas", "Dominic", "Austin", "Everett", "Brooks", "Xavier", "Kai", "Jose",
+    "Parker", "Adam", "Jace", "Wesley", "Kayden", "Silas", "Bennett", "Declan",
+    "Waylon", "Weston", "Evan", "Emmett", "Micah", "Ryder", "Beau", "Damian",
+    "Brayden", "Gael", "Rowan", "Harrison", "Bryson", "Sawyer", "Amir", "Kingston",
+    "Jason", "Giovanni", "Vincent", "Ayden", "Chase", "Myles", "Diego", "Nathaniel",
+    "Legend", "Jonah", "River", "Tyler", "Cole", "Braxton", "George", "Milo",
+    "Zachary", "Ashton", "Luis", "Jasper", "Kaiden", "Adriel", "Gavin", "Bentley",
+    "Calvin", "Zion", "Juan", "Maxwell", "Max", "Ryker", "Carlos", "Emmanuel",
+    "Jayce", "Lorenzo", "Ivan", "Jude", "August", "Kevin", "Malachi", "Elliott",
+    "Rhett", "Archer", "Karter", "Arthur", "Lukas", "Elliot", "Thiago", "Brandon",
+    "Camden", "Justin", "Jesus", "Maddox", "King", "Theo", "Enzo", "Matteo",
+    "Emilio", "Dean", "Hayden", "Finn", "Brody", "Antonio", "Abel", "Tristan",
+    "Graham", "Zayden", "Judah", "Xander", "Miguel", "Atlas", "Tucker", "Timothy"
 ]
 
 LAST_NAMES: List[str] = [
-    "Anderson", "Taylor", "Thomas", "Moore", "Jackson",
-    "White", "Harris", "Martin", "Thompson", "Young"
+    "Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis",
+    "Rodriguez", "Martinez", "Hernandez", "Lopez", "Gonzalez", "Wilson", "Anderson",
+    "Thomas", "Taylor", "Moore", "Jackson", "Martin", "Lee", "Perez", "Thompson",
+    "White", "Harris", "Sanchez", "Clark", "Ramirez", "Lewis", "Robinson", "Walker",
+    "Young", "Allen", "King", "Wright", "Scott", "Torres", "Nguyen", "Hill",
+    "Flores", "Green", "Adams", "Nelson", "Baker", "Hall", "Rivera", "Campbell",
+    "Mitchell", "Carter", "Roberts", "Gomez", "Phillips", "Evans", "Turner",
+    "Diaz", "Parker", "Cruz", "Edwards", "Collins", "Reyes", "Stewart", "Morris",
+    "Morales", "Murphy", "Cook", "Rogers", "Gutierrez", "Ortiz", "Morgan", "Cooper",
+    "Peterson", "Bailey", "Reed", "Kelly", "Howard", "Ramos", "Kim", "Cox",
+    "Ward", "Richardson", "Watson", "Brooks", "Chavez", "Wood", "James", "Bennett",
+    "Gray", "Mendoza", "Ruiz", "Hughes", "Price", "Alvarez", "Castillo", "Sanders",
+    "Patel", "Myers", "Long", "Ross", "Foster", "Jimenez", "Powell", "Jenkins",
+    "Perry", "Russell", "Sullivan", "Bell", "Coleman", "Butler", "Henderson",
+    "Barnes", "Gonzales", "Fisher", "Vasquez", "Simmons", "Romero", "Jordan",
+    "Patterson", "Alexander", "Hamilton", "Graham", "Reynolds", "Griffin",
+    "Wallace", "Moreno", "West", "Cole", "Hayes", "Bryant", "Herrera", "Gibson",
+    "Ellis", "Tran", "Medina", "Aguilar", "Stevens", "Murray", "Ford", "Castro",
+    "Marshall", "Owens", "Harrison", "Fernandez", "McDonald", "Woods", "Washington",
+    "Kennedy", "Wells", "Vargas", "Henry", "Chen", "Freeman", "Webb", "Tucker",
+    "Guzman", "Burns", "Crawford", "Olson", "Simpson", "Porter", "Hunter", "Gordon",
+    "Mendez", "Silva", "Shaw", "Snyder", "Mason", "Dixon", "Munoz", "Hunt",
+    "Hicks", "Holmes", "Palmer", "Wagner", "Black", "Robertson", "Boyd", "Rose",
+    "Stone", "Salazar", "Fox", "Warren", "Mills", "Meyer", "Rice", "Schmidt",
+    "Garza", "Daniels", "Ferguson", "Nichols", "Stephens", "Soto", "Weaver",
+    "Ryan", "Gardner", "Payne", "Grant", "Dunn", "Kelley", "Spencer", "Hawkins"
 ]
 
 # Username suffix appended to generated usernames
