@@ -13,7 +13,7 @@ import requests
 from fake_useragent import UserAgent
 
 from config import TOR_CONTROL_PORT, TOR_PORT
-from utils import format_error, logger, renew_tor
+from utils import format_error, logger, renew_tor, mask
 
 
 class EmailOnDeck:
@@ -57,9 +57,7 @@ class EmailOnDeck:
                 'https': f'socks5://127.0.0.1:{TOR_PORT}'
             }
 
-        logger("🚀 Initializing EmailOnDeck...", level=0)
         self._init_session()
-        logger("✅ API ready", level=0)
 
     def _init_session(self) -> None:
         """Initialize HTTP session with appropriate headers and proxy settings."""
@@ -162,8 +160,8 @@ class EmailOnDeck:
             self.email = parts[0]
             self.token = parts[1]
 
-            logger(f"✅ Email: {self.email}", level=level + 1)
-            logger(f"✅ Token: {self.token}", level=level + 1)
+            logger(f"✅ Email: {mask(self.email, 4)}", level=level + 1)
+            logger(f"✅ Token: {mask(self.token, 4)}", level=level + 1)
 
             return {
                 'email': self.email,
@@ -255,7 +253,7 @@ class EmailOnDeck:
         )
 
         if content:
-            logger(f"📧 Retrieved email: {msg_id}", level=level)
+            logger(f"📧 Retrieved email: {mask(msg_id, 4)}", level=level)
             return {
                 'id': msg_id,
                 'body_html': content,

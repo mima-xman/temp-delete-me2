@@ -1,0 +1,97 @@
+name: Test GithubGenTMailor Copy 3
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+   inputs:
+    creator_name:
+      description: 'Creator Name'
+      required: true
+      default: 'Github Workflows'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        instance: [1, 2, 3, 4, 5, 6]
+      fail-fast: false
+    name: Test Instance ${{ matrix.instance }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          playwright install chrome
+          # Install xvfb for headed mode support if needed
+          sudo apt-get install -y xvfb
+      
+      - name: Install Tor
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tor
+      
+      - name: Configure Tor
+        run: |
+          # Configure Tor to match script defaults (9150/9151)
+          echo "ControlPort 9151" | sudo tee -a /etc/tor/torrc
+          echo "SocksPort 9150" | sudo tee -a /etc/tor/torrc
+          echo "CookieAuthentication 0" | sudo tee -a /etc/tor/torrc
+          echo "Log notice file /var/log/tor/log" | sudo tee -a /etc/tor/torrc
+          
+          # Restart Tor service to apply changes
+          sudo systemctl restart tor@default
+          
+          # Wait for Tor to be ready
+          sleep 10
+          
+          # Check status
+          sudo ss -tulpn | grep tor
+          sudo systemctl status tor@default --no-pager
+
+      - name: Patch Script for CI
+        run: |
+          # Remove blocking input at the end of the script
+          sed -i 's/input("Press Enter to close the browser...")/print("Browser closing automatically in CI")/g' GithubGenTMailor-copy-3.py
+          # Force Headless to True in config.py for CI
+          sed -i 's/HEADLESS = False/HEADLESS = True/g' config.py
+          # Patch Chrome Path to Linux standard location (or rely on playwright path)
+          # We use a trick: if we set CHROME_PATH to empty string or None, playwright might auto-detect if we used 'channel="chrome"'
+          # But the script uses executable_path argument.
+          # On GitHub Actions, Chrome is usually at /usr/bin/google-chrome
+          sed -i 's|CHROME_PATH = r"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"|CHROME_PATH = "/usr/bin/google-chrome"|g' config.py
+
+      - name: Run Python Code
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          CREATOR_NAME: ${{ github.event.inputs.creator_name }}
+          TOR_PORT: 9150
+          TOR_CONTROL_PORT: 9151
+          PYTHONUNBUFFERED: "1"
+        run: |
+          # Run with xvfb just in case, though we patched HEADLESS=True
+          xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" python github_generator.py
+      
+      # - name: Upload Artifacts
+      #   if: always()
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: execution-artifacts-${{ matrix.instance }}
+      #     path: |
+      #       output/
+      #       *.png
+      #       *.html
+      #       *.log
+      #     retention-days: 5

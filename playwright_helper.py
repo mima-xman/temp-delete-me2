@@ -272,17 +272,29 @@ class PlaywrightHelper:
         self,
         selector: str,
         iframe_selector: Optional[str] = None,
+        retries: Optional[int] = None,
         timeout: Optional[int] = None
     ) -> bool:
-        """Quick check if element is visible (no retries)."""
-        try:
-            op_timeout = timeout if timeout is not None else self.default_timeout
-            locator = self._get_locator(selector, iframe_selector)
-            if locator is None:
-                return False
-            return locator.first.is_visible(timeout=op_timeout)
-        except Exception:
-            return False
+        """Quick check if element is visible (with optional retries)."""
+        max_retries = retries if retries is not None else 1
+        op_timeout = timeout if timeout is not None else self.default_timeout
+        
+        for attempt in range(max_retries):
+            try:
+                locator = self._get_locator(selector, iframe_selector)
+                if locator is None:
+                    if attempt < max_retries - 1:
+                        self._humanize_delay(0.3, 0.7)
+                    continue
+                if locator.first.is_visible(timeout=op_timeout):
+                    return True
+            except Exception:
+                pass
+            
+            if attempt < max_retries - 1:
+                self._humanize_delay(0.3, 0.7)
+        
+        return False
 
     def click(
         self,

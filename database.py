@@ -26,9 +26,7 @@ class DatabaseManager:
         try:
             self._client = MongoClient(mongodb_uri)
             self._db = self._client[db_name]
-            print(f"✅ DatabaseManager connected to {db_name}")
         except Exception as e:
-            print(f"❌ DatabaseManager Error: {e}")
             self._client = None
             self._db = None
 

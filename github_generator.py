@@ -31,7 +31,7 @@ from config import (
 from playwright_helper import PlaywrightHelper
 from database import DatabaseManager
 from TempMailServices.EmailOnDeck import EmailOnDeck
-from utils import format_error, get_2fa_code, logger, renew_tor
+from utils import format_error, get_2fa_code, logger, renew_tor, mask
 
 load_dotenv()
 
@@ -100,6 +100,7 @@ MAX_CAPTCHA_WAIT_ITERATIONS = 25
 MAX_RETRIES_FOR_USERNAME_UPDATE = 5
 ASK_BEFORE_CLOSE_BROWSER = True
 CREATOR_NAME = os.getenv("CREATOR_NAME", "Unknown")
+EMAIL_SERVICE_NAME = "EmailOnDeck"
 
 
 @dataclass
@@ -139,17 +140,6 @@ class GithubTMailorGenerator:
         if self.use_tor:
             logger("Using TOR network for emails...", level=1)
             _, self.ip = renew_tor(level=1)
-
-    # --------------------------------------------------------------------------
-    # Utils
-    # --------------------------------------------------------------------------
-    def _mask(self, value: str, show_chars: int = 3) -> str:
-        """Mask sensitive data, showing only first few characters."""
-        if not value:
-            return "***"
-        if len(value) <= show_chars:
-            return "*" * len(value)
-        return value[:show_chars] + "*" * (len(value) - show_chars)
 
     # --------------------------------------------------------------------------
     # Init / dirs
@@ -203,6 +193,8 @@ class GithubTMailorGenerator:
             username = random.choice(patterns).lower()
             # Clean up double separators
             username = username.replace("--", "-").replace("__", "_").replace("-_", "-").replace("_-", "_")
+
+            logger(f"✓ Generated username: {mask(username, 4)}", level=level + 1)
             return username
         except Exception as e:
             logger(f"✗ Failed to generate username: {format_error(e)}", level=level + 1)
@@ -223,7 +215,7 @@ class GithubTMailorGenerator:
                 status="pending",
             )
 
-            logger(f"✓ Generated account info: {self._mask(username, 4)} | {self._mask(password)}", level=level + 1)
+            logger(f"✓ Generated account info: {mask(username, 4)} | {mask(password)}", level=level + 1)
             return asdict(self.account_data)
         except Exception as e:
             logger(f"✗ Failed to generate account info: {format_error(e)}", level=level + 1)
@@ -233,7 +225,7 @@ class GithubTMailorGenerator:
         logger("[######] Getting email address...", level=level)
         try:
             self.email_service = EmailOnDeck()
-            result = self.email_service.generate_email()
+            result = self.email_service.generate_email(level=level + 1)
 
             if not result or not result.get("email"):
                 logger("✗ Failed to generate email address", level=level + 1)
@@ -241,7 +233,7 @@ class GithubTMailorGenerator:
 
             self.account_data.email_address = result["email"]
             self.account_data.email_token = result.get("token", "N/A")
-            logger(f"✓ Email obtained: {self.account_data.email_address}", level=level + 1)
+            logger(f"✓ Email obtained: {mask(self.account_data.email_address, 4)}", level=level + 1)
             return self.account_data.email_address
         except Exception as e:
             logger(f"✗ Failed to get email address: {format_error(e)}", level=level + 1)
@@ -380,6 +372,7 @@ class GithubTMailorGenerator:
         if self.helper.check_element_exists(SELECTORS["username_error"], timeout=3000):
             logger("✗ Username already exists", level=level + 1)
             return True
+        logger("✓ Username is available. No error exists", level=level + 1)
         return False
     
     def _change_username(self, level: int = 0) -> bool:
@@ -537,12 +530,12 @@ class GithubTMailorGenerator:
     def _fetch_verification_code_from_email(self, level: int = 0) -> Optional[str]:
         logger("[######] Fetching verification code from email...", level=level)
 
-        new_email = self.email_service.wait_for_email(120)
+        new_email = self.email_service.wait_for_email(timeout=120, level=level + 1)
         if not new_email:
             logger("✗ No email received", level=level + 1)
             return None
 
-        content = self.email_service.get_email(new_email)
+        content = self.email_service.get_email(new_email, level=level + 1)
         if not content:
             logger("✗ Failed to get email content", level=level + 1)
             return None
@@ -550,7 +543,7 @@ class GithubTMailorGenerator:
         code = self._extract_verification_code(content[self.email_service.body_key])
         if code:
             self.verification_code = code
-            logger(f"✓ Verification code found: {self._mask(code, 2)}", level=level + 1)
+            logger(f"✓ Verification code found: {mask(code, 2)}", level=level + 1)
         else:
             logger("✗ Verification code not found in email", level=level + 1)
 
@@ -575,9 +568,9 @@ class GithubTMailorGenerator:
 
         for i in range(5):
             # Check if the submit button is visible
-            if self.helper.check_element_visible(SELECTORS["verification_submit"], retries=1, timeout=5000):
+            if self.helper.check_element_visible(SELECTORS["verification_submit"], timeout=5000):
                 # Click the submit button
-                if self.helper.click(SELECTORS["verification_submit"]):
+                if self.helper.click(SELECTORS["verification_submit"], retries=1, timeout=5000):
                     logger("✓ Verification submitted", level=level + 1)
                     return True
 
@@ -728,13 +721,13 @@ class GithubTMailorGenerator:
                 return False
 
             self.secret = secret.strip()
-            logger(f"✓ Secret obtained: {self._mask(self.secret, 4)}", level=level + 1)
+            logger(f"✓ Secret obtained: {mask(self.secret, 4)}", level=level + 1)
 
             self.helper.wait_natural_delay(2, 4)
 
             # Generate and enter 2FA code
             code = get_2fa_code(self.secret)
-            logger(f"Generated 2FA Code: {self._mask(code, 2)}", level=level + 1)
+            logger(f"Generated 2FA Code: {mask(code, 2)}", level=level + 1)
 
             if not self.helper.type_text(SELECTORS["2fa_code_input"], code):
                 logger("✗ Failed to enter 2FA code", level=level + 1)
@@ -857,10 +850,10 @@ class GithubTMailorGenerator:
             account_document = {
                 "email": self.account_data.email_address,
                 "email_token": self.account_data.email_token,
+                "email_service_name": EMAIL_SERVICE_NAME,
                 "username": self.account_data.username,
                 "password": self.account_data.password,
                 "ip": self.ip,
-                "verification_code": self.verification_code,
                 "secret": self.secret,
                 "recovery_codes": self.recovery_codes,
                 "status": self.account_data.status,
@@ -871,7 +864,7 @@ class GithubTMailorGenerator:
 
             result = collection.insert_one(account_document)
             if result.inserted_id:
-                logger(f"✓ Account saved to DB with ID: {result.inserted_id}", level=level + 1)
+                logger(f"✓ Account saved to DB with ID: {mask(str(result.inserted_id), 4)}", level=level + 1)
                 return True
             else:
                 logger("✗ Failed to insert account to DB", level=level + 1)

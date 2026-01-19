@@ -142,6 +142,15 @@ def get_2fa_code(secret: str) -> str:
     return totp.now()
 
 
+def mask(value: str, show_chars: int = 3) -> str:
+    """Mask sensitive data, showing only first few characters."""
+    if not value:
+        return "***"
+    if len(value) <= show_chars:
+        return "*" * len(value)
+    return value[:show_chars] + "*" * (len(value) - show_chars)
+
+
 if __name__ == "__main__":
     # Example usage
     test_secret = "WNC34H4G6ZHVLP43"
