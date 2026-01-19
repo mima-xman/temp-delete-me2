@@ -98,17 +98,17 @@ jobs:
           # Run with xvfb just in case, though we patched HEADLESS=True
           xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" python github_generator.py
       
-      # - name: Upload Artifacts
-      #   if: always()
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: execution-artifacts-${{ matrix.instance }}
-      #     path: |
-      #       output/
-      #       *.png
-      #       *.html
-      #       *.log
-      #     retention-days: 5
+      - name: Upload Artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: execution-artifacts
+          path: |
+            output/
+            *.png
+            *.html
+            *.log
+          retention-days: 5
 
       - name: Trigger another run
         if: always()

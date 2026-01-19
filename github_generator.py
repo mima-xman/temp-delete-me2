@@ -148,11 +148,11 @@ class GithubTMailorGenerator:
     def _init_output_dirs(self) -> None:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         self.screenshots_dir = os.path.join(OUTPUT_DIR, f"github_screenshots_{timestamp}")
-        self.html_reports_dir = os.path.join(OUTPUT_DIR, f"github_html_reports_{timestamp}")
+        # self.html_reports_dir = os.path.join(OUTPUT_DIR, f"github_html_reports_{timestamp}")
 
         os.makedirs(OUTPUT_DIR, exist_ok=True)
         os.makedirs(self.screenshots_dir, exist_ok=True)
-        os.makedirs(self.html_reports_dir, exist_ok=True)
+        # os.makedirs(self.html_reports_dir, exist_ok=True)
 
     # --------------------------------------------------------------------------
     # Data generation
@@ -633,14 +633,21 @@ class GithubTMailorGenerator:
         logger("✗ Failed to reach dashboard", level=level + 1)
         return False
 
-    def _simulate_human_scrolling(self) -> None:
+    def _simulate_human_scrolling(self, level: int = 0) -> None:
         """Simulate human scrolling behavior."""
+        logger("[######] Simulating human scrolling...", level=level)
+
+        logger("✓ Scrolling down", level=level + 1)
         self.helper.scroll_page("down")
-        self.helper.wait_natural_delay(0.5, 1.0)
+        self.helper.wait_natural_delay(2, 4)
+
+        logger("✓ Scrolling middle", level=level + 1)
         self.helper.scroll_page("middle")
-        self.helper.wait_natural_delay(0.5, 1.0)
+        self.helper.wait_natural_delay(2, 4)
+        
+        logger("✓ Scrolling up", level=level + 1)
         self.helper.scroll_page("up")
-        self.helper.wait_natural_delay(0.5, 1.0)
+        self.helper.wait_natural_delay(2, 4)
 
     def _setup_2fa(self, level: int = 0) -> bool:
         logger("[######] Setting up 2FA...", level=level)
@@ -664,7 +671,7 @@ class GithubTMailorGenerator:
 
             self.helper.wait_natural_delay(1, 2)
             logger("Simulating human behavior...", level=level + 1)
-            self._simulate_human_scrolling()
+            self._simulate_human_scrolling(level=level + 1)
 
             # Navigate to 2FA settings using actions
             nav_actions = [
@@ -680,9 +687,11 @@ class GithubTMailorGenerator:
                 # Fallback: try avatar click or direct navigation
                 logger("Menu click failed, trying fallback...", level=level + 1)
                 if not self.helper.click(SELECTORS["user_avatar"]):
+                    logger("Avatar click failed, trying direct navigation...", level=level + 1)
                     self.helper.goto("https://github.com/settings/profile", timeout=30000)
                     self.helper.wait_natural_delay(1, 2)
                     if not self.helper.wait_for_url_contains("profile", timeout=30000, retries=10):
+                        logger("✗ Failed to reach profile page", level=level + 1)
                         return False
 
             self.helper.wait_natural_delay(2, 4)
@@ -695,10 +704,11 @@ class GithubTMailorGenerator:
 
             logger("Clicking Password and authentication...", level=level + 1)
             if not self.helper.click(SELECTORS["security_link"]):
-                logger("✗ Failed to click security link", level=level + 1)
+                logger("✗ Failed to click security link, trying direct navigation...", level=level + 1)
                 self.helper.goto("https://github.com/settings/security", timeout=30000)
                 self.helper.wait_natural_delay(1, 2)
                 if not self.helper.wait_for_url_contains("security", timeout=30000, retries=10):
+                    logger("✗ Failed to reach security page", level=level + 1)
                     return False
 
             self.helper.wait_natural_delay(2, 4)
@@ -707,10 +717,11 @@ class GithubTMailorGenerator:
 
             logger("Clicking Enable 2FA...", level=level + 1)
             if not self.helper.click(SELECTORS["enable_2fa_link"]):
-                logger("✗ Failed to click Enable 2FA", level=level + 1)
+                logger("✗ Failed to click Enable 2FA, trying direct navigation...", level=level + 1)
                 self.helper.goto("https://github.com/settings/two_factor_authentication/setup/intro", timeout=30000)
                 self.helper.wait_natural_delay(2, 4)
                 if not self.helper.wait_for_url_contains("intro", timeout=30000, retries=10):
+                    logger("✗ Failed to reach intro page", level=level + 1)
                     return False
 
             self.helper.wait_natural_delay(2, 4)
@@ -1006,6 +1017,8 @@ class GithubTMailorGenerator:
                 # Setup 2FA
                 if not self._setup_2fa(level=level + 1):
                     logger("✗ 2FA Setup failed", level=level + 1)
+                    self._save_screenshot(level=level + 1)
+                    return False
                 else:
                     logger("✓ 2FA Setup completed successfully", level=level + 1)
 
