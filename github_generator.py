@@ -101,6 +101,7 @@ MAX_RETRIES_FOR_USERNAME_UPDATE = 5
 ASK_BEFORE_CLOSE_BROWSER = True
 CREATOR_NAME = os.getenv("CREATOR_NAME", "Unknown")
 EMAIL_SERVICE_NAME = "EmailOnDeck"
+MAX_RETRIES_FOR_GENERATE_ACCOUNT = os.getenv("MAX_RETRIES_FOR_GENERATE_ACCOUNT", 1000)
 
 
 @dataclass
@@ -1094,4 +1095,4 @@ class GithubTMailorGenerator:
 
 if __name__ == "__main__":
     generator = GithubTMailorGenerator(use_tor=True)
-    generator.run_flow_with_retries(max_retries=1000)
+    generator.run_flow_with_retries(max_retries=MAX_RETRIES_FOR_GENERATE_ACCOUNT)

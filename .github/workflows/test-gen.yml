@@ -10,6 +10,10 @@ on:
       description: 'Creator Name'
       required: true
       default: 'Github Workflows (default name)'
+    max_retries:
+      description: 'Max Retries'
+      required: true
+      default: '1000'
 
 jobs:
   test:
@@ -79,6 +83,7 @@ jobs:
           CREATOR_NAME: ${{ github.event.inputs.creator_name }}
           TOR_PORT: 9150
           TOR_CONTROL_PORT: 9151
+          MAX_RETRIES_FOR_GENERATE_ACCOUNT: ${{ github.event.inputs.max_retries || 1000 }}
           PYTHONUNBUFFERED: "1"
         run: |
           # Run with xvfb just in case, though we patched HEADLESS=True
@@ -100,5 +105,4 @@ jobs:
         if: always()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh workflow run test-gen.yml --ref ${{ github.ref_name }} -f creator_name="${{ github.event.inputs.creator_name }}"
-
+        run: gh workflow run test-gen.yml --ref ${{ github.ref_name }} -f creator_name="${{ github.event.inputs.creator_name }} - Instance ${{ github.run_number }}" -f max_retries="${{ github.event.inputs.max_retries || 1000 }}"
