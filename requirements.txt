@@ -14,3 +14,6 @@ curl_cffi
 
 # 2FA support
 pyotp
+
+# Database
+pymongo

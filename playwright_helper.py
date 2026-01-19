@@ -771,18 +771,49 @@ class PlaywrightHelper:
         direction: str = "down",
         amount: Optional[int] = None
     ) -> bool:
-        """Scroll the page up or down."""
+        """Scroll the page up or down with human-like smooth scrolling."""
         try:
+            import random
+            import time
+            
             if amount is None:
+                # Get target position based on direction
                 if direction == "down":
-                    self.page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                    target = self.page.evaluate("document.body.scrollHeight")
                 elif direction == "up":
-                    self.page.evaluate("window.scrollTo(0, 0)")
+                    target = 0
                 elif direction == "middle":
-                    self.page.evaluate("window.scrollTo(0, document.body.scrollHeight / 2)")
+                    target = self.page.evaluate("document.body.scrollHeight / 2")
+                else:
+                    return False
+                
+                current = self.page.evaluate("window.scrollY")
+                total_distance = target - current
+                
+                if total_distance == 0:
+                    return True
+                
+                # Scroll in small increments for human-like behavior
+                scroll_direction = 1 if total_distance > 0 else -1
+                remaining = abs(total_distance)
+                
+                while remaining > 0:
+                    # Random step size between 50-150 pixels
+                    step = min(random.randint(50, 150), remaining)
+                    self.page.evaluate(f"window.scrollBy(0, {step * scroll_direction})")
+                    remaining -= step
+                    # Small random delay between scrolls (20-80ms)
+                    time.sleep(random.uniform(0.02, 0.08))
             else:
-                scroll_amount = amount if direction == "down" else -amount
-                self.page.evaluate(f"window.scrollBy(0, {scroll_amount})")
+                # Scroll specific amount in increments
+                scroll_direction = 1 if direction == "down" else -1
+                remaining = amount
+                
+                while remaining > 0:
+                    step = min(random.randint(50, 150), remaining)
+                    self.page.evaluate(f"window.scrollBy(0, {step * scroll_direction})")
+                    remaining -= step
+                    time.sleep(random.uniform(0.02, 0.08))
 
             self._humanize_delay(0.2, 0.5)
             return True

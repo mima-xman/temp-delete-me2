@@ -29,6 +29,7 @@ from config import (
     TOR_PORT,
 )
 from playwright_helper import PlaywrightHelper
+from database import DatabaseManager
 from TempMailServices.EmailOnDeck import EmailOnDeck
 from utils import format_error, get_2fa_code, logger, renew_tor
 
@@ -94,9 +95,11 @@ SELECTORS = {
     "done_button": "button[data-target='single-page-wizard-step.nextButton']:has-text('Done')",
 }
 
-USERNAME_PREFIX = "dev1"
+USERNAME_PREFIXES = ["developer", "coder", "hacker", "builder"]
 MAX_CAPTCHA_WAIT_ITERATIONS = 25
 MAX_RETRIES_FOR_USERNAME_UPDATE = 5
+ASK_BEFORE_CLOSE_BROWSER = True
+CREATOR_NAME = os.getenv("CREATOR_NAME", "Unknown")
 
 
 @dataclass
@@ -138,6 +141,17 @@ class GithubTMailorGenerator:
             _, self.ip = renew_tor(level=1)
 
     # --------------------------------------------------------------------------
+    # Utils
+    # --------------------------------------------------------------------------
+    def _mask(self, value: str, show_chars: int = 3) -> str:
+        """Mask sensitive data, showing only first few characters."""
+        if not value:
+            return "***"
+        if len(value) <= show_chars:
+            return "*" * len(value)
+        return value[:show_chars] + "*" * (len(value) - show_chars)
+
+    # --------------------------------------------------------------------------
     # Init / dirs
     # --------------------------------------------------------------------------
     def _init_output_dirs(self) -> None:
@@ -157,7 +171,39 @@ class GithubTMailorGenerator:
         try:
             first_name = random.choice(FIRST_NAMES)
             last_name = random.choice(LAST_NAMES)
-            return f"{first_name}{last_name}-{USERNAME_PREFIX}".lower()
+            prefix = random.choice(USERNAME_PREFIXES)
+            
+            # Random separator (hyphen, underscore, or none)
+            separators = ["-", "_", ""]
+            sep1 = random.choice(separators)
+            sep2 = random.choice(separators)
+            
+            # Natural-looking random suffix options
+            suffix_options = [
+                # Birth year style (90-09)
+                str(random.randint(90, 99)),
+                str(random.randint(0, 9)).zfill(2),
+                # Short numbers (common in usernames)
+                str(random.randint(1, 99)),
+                str(random.randint(100, 999)),
+                # Empty (no suffix)
+                "",
+                "",
+            ]
+            suffix = random.choice(suffix_options)
+            
+            # Build username with varied patterns
+            patterns = [
+                f"{first_name}{sep1}{last_name}{sep2}{prefix}{suffix}",
+                f"{first_name}{sep1}{prefix}{sep2}{last_name}{suffix}",
+                f"{prefix}{sep1}{first_name}{sep2}{last_name}{suffix}",
+                f"{first_name}{last_name}{suffix}",
+            ]
+            
+            username = random.choice(patterns).lower()
+            # Clean up double separators
+            username = username.replace("--", "-").replace("__", "_").replace("-_", "-").replace("_-", "_")
+            return username
         except Exception as e:
             logger(f"✗ Failed to generate username: {format_error(e)}", level=level + 1)
             return "".join(random.choices(string.ascii_lowercase + string.digits, k=12))
@@ -177,7 +223,7 @@ class GithubTMailorGenerator:
                 status="pending",
             )
 
-            logger(f"✓ Generated account info: {username} | {password}", level=level + 1)
+            logger(f"✓ Generated account info: {self._mask(username, 4)} | {self._mask(password)}", level=level + 1)
             return asdict(self.account_data)
         except Exception as e:
             logger(f"✗ Failed to generate account info: {format_error(e)}", level=level + 1)
@@ -504,7 +550,7 @@ class GithubTMailorGenerator:
         code = self._extract_verification_code(content[self.email_service.body_key])
         if code:
             self.verification_code = code
-            logger(f"✓ Verification code found: {code}", level=level + 1)
+            logger(f"✓ Verification code found: {self._mask(code, 2)}", level=level + 1)
         else:
             logger("✗ Verification code not found in email", level=level + 1)
 
@@ -518,7 +564,7 @@ class GithubTMailorGenerator:
             if not self.helper.fill(selector, digit, humanize_typing=False, clear_first=True):
                 logger(f"✗ Failed to fill digit {i + 1}", level=level + 1)
                 return False
-            logger(f"✓ Filled digit {i + 1}: {digit}", level=level + 1)
+            logger(f"✓ Filled digit {i + 1}", level=level + 1)
             self.helper.wait_natural_delay(0.3, 0.7)
 
         logger("✓ Verification code filled", level=level + 1)
@@ -527,16 +573,19 @@ class GithubTMailorGenerator:
     def _submit_verification_code(self, level: int = 0) -> bool:
         logger("[######] Submitting verification code...", level=level)
 
-        if self.helper.check_element_visible(SELECTORS["verification_submit"], timeout=5000):
-            if self.helper.click(SELECTORS["verification_submit"]):
-                logger("✓ Verification submitted", level=level + 1)
-                return True
+        for i in range(5):
+            # Check if the submit button is visible
+            if self.helper.check_element_visible(SELECTORS["verification_submit"], retries=1, timeout=5000):
+                # Click the submit button
+                if self.helper.click(SELECTORS["verification_submit"]):
+                    logger("✓ Verification submitted", level=level + 1)
+                    return True
 
-        # Check if auto-submitted by URL change
-        current_url = self.helper.get_current_url()
-        if current_url and current_url != GITHUB_SIGNUP_URL:
-            logger("✓ Code auto-submitted (URL changed)", level=level + 1)
-            return True
+            # Check if auto-submitted by URL change
+            current_url = self.helper.get_current_url()
+            if current_url and current_url != GITHUB_SIGNUP_URL and "login" in current_url:
+                logger("✓ Code auto-submitted (URL changed)", level=level + 1)
+                return True
 
         logger("✗ Code submission failed", level=level + 1)
         return False
@@ -679,13 +728,13 @@ class GithubTMailorGenerator:
                 return False
 
             self.secret = secret.strip()
-            logger(f"✓ Secret obtained: {self.secret}", level=level + 1)
+            logger(f"✓ Secret obtained: {self._mask(self.secret, 4)}", level=level + 1)
 
             self.helper.wait_natural_delay(2, 4)
 
             # Generate and enter 2FA code
             code = get_2fa_code(self.secret)
-            logger(f"Generated 2FA Code: {code}", level=level + 1)
+            logger(f"Generated 2FA Code: {self._mask(code, 2)}", level=level + 1)
 
             if not self.helper.type_text(SELECTORS["2fa_code_input"], code):
                 logger("✗ Failed to enter 2FA code", level=level + 1)
@@ -698,11 +747,11 @@ class GithubTMailorGenerator:
             recovery_codes_list_exists = False
             logger("Clicking Continue...", level=level + 1)
             for i in range(5):
-                if self.helper.click(SELECTORS["2fa_continue_button"], retries=1):
+                if self.helper.click(SELECTORS["2fa_continue_button"], retries=1, timeout=3000):
                     logger("✓ Continue clicked", level=level + 1)
                     break
                 
-                if self.helper.check_element_exists(SELECTORS["recovery_codes_list"], retries=1, timeout=10000):
+                if self.helper.check_element_exists(SELECTORS["recovery_codes_list"], retries=1, timeout=3000):
                     recovery_codes_list_exists = True
                     logger("✓ Recovery codes page reached. Button continue clicked automatically", level=level + 1)
                     break
@@ -717,7 +766,7 @@ class GithubTMailorGenerator:
 
             # Get recovery codes
             if not recovery_codes_list_exists:
-                if self.helper.check_element_exists(SELECTORS["recovery_codes_list"], timeout=10000):
+                if self.helper.check_element_exists(SELECTORS["recovery_codes_list"], timeout=3000):
                     logger("✓ Recovery codes page reached", level=level + 1)
                 else:
                     logger("⚠ Recovery codes not immediately visible", level=level + 1)
@@ -752,7 +801,7 @@ class GithubTMailorGenerator:
 
         except Exception as e:
             logger(f"✗ 2FA Setup error: {format_error(e)}", level=level + 1)
-            self._save_screenshot(level=level + 1)
+            # self._save_screenshot(level=level + 1)
             return False
 
     # --------------------------------------------------------------------------
@@ -794,16 +843,64 @@ class GithubTMailorGenerator:
         except Exception as e:
             logger(f"✗ Failed to save account data: {format_error(e)}", level=level + 1)
 
+    def _save_account_to_db(self, level: int = 0) -> bool:
+        """Save account data to MongoDB database."""
+        logger("[######] Saving account to database...", level=level)
+        try:
+            db_manager = DatabaseManager()
+            collection = db_manager.get_collection("github_accounts")
+            
+            if collection is None:
+                logger("✗ Failed to get database collection", level=level + 1)
+                return False
+
+            account_document = {
+                "email": self.account_data.email_address,
+                "email_token": self.account_data.email_token,
+                "username": self.account_data.username,
+                "password": self.account_data.password,
+                "ip": self.ip,
+                "verification_code": self.verification_code,
+                "secret": self.secret,
+                "recovery_codes": self.recovery_codes,
+                "status": self.account_data.status,
+                "created_by": CREATOR_NAME,
+                "created_at": datetime.now(),
+                "updated_at": datetime.now(),
+            }
+
+            result = collection.insert_one(account_document)
+            if result.inserted_id:
+                logger(f"✓ Account saved to DB with ID: {result.inserted_id}", level=level + 1)
+                return True
+            else:
+                logger("✗ Failed to insert account to DB", level=level + 1)
+                return False
+        except Exception as e:
+            logger(f"✗ Failed to save account to DB: {format_error(e)}", level=level + 1)
+            return False
+
     # --------------------------------------------------------------------------
     # Main flow
     # --------------------------------------------------------------------------
     def run_flow(self, level: int = 0) -> bool:
-        logger("GitHub TMailor Account Generator", level=level)
+        print("  ")
+        logger("═" * 60, level=level)
+        logger("       GitHub TMailor Account Generator", level=level)
+        logger("═" * 60, level=level)
 
         with sync_playwright() as p:
             self.playwright = p
 
             try:
+                # ══════════════════════════════════════════════════════════
+                # PHASE 1: ACCOUNT SETUP
+                # ══════════════════════════════════════════════════════════
+                print("  ")
+                logger("─" * 50, level=level + 1)
+                logger("📋 PHASE 1: ACCOUNT SETUP", level=level + 1)
+                logger("─" * 50, level=level + 1)
+
                 # Generate account info
                 self._generate_account_info(level=level + 1)
 
@@ -811,9 +908,25 @@ class GithubTMailorGenerator:
                 if not self._get_email_address(level=level + 1):
                     return False
 
+                # ══════════════════════════════════════════════════════════
+                # PHASE 2: BROWSER SETUP
+                # ══════════════════════════════════════════════════════════
+                print("  ")
+                logger("─" * 50, level=level + 1)
+                logger("🌐 PHASE 2: BROWSER SETUP", level=level + 1)
+                logger("─" * 50, level=level + 1)
+
                 # Launch browser
                 if not self._launch_browser(level=level + 1):
                     return False
+
+                # ══════════════════════════════════════════════════════════
+                # PHASE 3: SIGNUP PROCESS
+                # ══════════════════════════════════════════════════════════
+                print("  ")
+                logger("─" * 50, level=level + 1)
+                logger("📝 PHASE 3: SIGNUP PROCESS", level=level + 1)
+                logger("─" * 50, level=level + 1)
 
                 # Open signup page
                 if not self._open_signup(level=level + 1):
@@ -821,6 +934,7 @@ class GithubTMailorGenerator:
 
                 # Accept cookies
                 self._accept_cookies_if_present(level=level + 1)
+                print("  ")
 
                 # Fill signup form
                 if not self._fill_signup_form(level=level + 1):
@@ -835,14 +949,31 @@ class GithubTMailorGenerator:
                         self._change_username(level=level + 1)
                     else:
                         break
+                print("  ")
 
                 # Submit signup
                 if not self._submit_signup(level=level + 1):
                     return False
 
+                # ══════════════════════════════════════════════════════════
+                # PHASE 4: CAPTCHA HANDLING
+                # ══════════════════════════════════════════════════════════
+                print("  ")
+                logger("─" * 50, level=level + 1)
+                logger("🔐 PHASE 4: CAPTCHA HANDLING", level=level + 1)
+                logger("─" * 50, level=level + 1)
+
                 # Wait for captcha to clear
                 if not self._wait_for_captcha_to_clear(level=level + 1):
                     return False
+
+                # ══════════════════════════════════════════════════════════
+                # PHASE 5: EMAIL VERIFICATION
+                # ══════════════════════════════════════════════════════════
+                print("  ")
+                logger("─" * 50, level=level + 1)
+                logger("📧 PHASE 5: EMAIL VERIFICATION", level=level + 1)
+                logger("─" * 50, level=level + 1)
 
                 # Wait for verification form
                 if not self._wait_for_verification_form(level=level + 1):
@@ -853,31 +984,58 @@ class GithubTMailorGenerator:
                 if not code:
                     logger("✗ Verification code not found in email", level=level + 2)
                     return False
+                print("  ")
 
                 # Fill verification code
                 if not self._fill_verification_code(code, level=level + 1):
                     return False
+                print("  ")
 
                 # Submit verification code
                 if not self._submit_verification_code(level=level + 1):
                     return False
 
                 # Wait for account creation
-                logger("Waiting for account creation...", level=level + 1)
+                print("  ")
+                logger("⏳ Waiting for account creation...", level=level + 1)
                 time.sleep(20)
-                logger("✓ Waited for account creation", level=level + 2)
+                logger("✓ Account creation wait completed", level=level + 1)
+
+                # ══════════════════════════════════════════════════════════
+                # PHASE 6: 2FA SETUP
+                # ══════════════════════════════════════════════════════════
+                print("  ")
+                logger("─" * 50, level=level + 1)
+                logger("🔑 PHASE 6: 2FA SETUP", level=level + 1)
+                logger("─" * 50, level=level + 1)
 
                 # Setup 2FA
                 if not self._setup_2fa(level=level + 1):
                     logger("✗ 2FA Setup failed", level=level + 1)
                 else:
-                    logger("✓ 2FA Setup completed", level=level + 1)
+                    logger("✓ 2FA Setup completed successfully", level=level + 1)
 
-                logger("✓ Flow execution finished", level=level + 1)
+                # ══════════════════════════════════════════════════════════
+                # PHASE 7: SAVE ACCOUNT
+                # ══════════════════════════════════════════════════════════
+                print("  ")
+                logger("─" * 50, level=level + 1)
+                logger("💾 PHASE 7: SAVE ACCOUNT", level=level + 1)
+                logger("─" * 50, level=level + 1)
+
+                # Update status and save to database
+                self.account_data.status = "active"
+                self._save_account_to_db(level=level + 1)
+
+                print("  ")
+                logger("═" * 60, level=level)
+                logger("✓ FLOW EXECUTION COMPLETED SUCCESSFULLY", level=level)
+                logger("═" * 60, level=level)
 
                 # Wait for user input
-                logger("Waiting for user input to close browser...", level=level + 1)
-                input("Press Enter to close the browser...")
+                if ASK_BEFORE_CLOSE_BROWSER:
+                    logger("Waiting for user input to close browser...", level=level + 1)
+                    input("Press Enter to close the browser...")
 
                 return True
 
@@ -886,37 +1044,58 @@ class GithubTMailorGenerator:
                 return False
 
             finally:
-                self._save_screenshot(level=level + 1)
-                self._save_account_data(level=level + 1)
+                # self._save_screenshot(level=level + 1)
+                # self._save_account_data(level=level + 1)
                 if self.browser:
                     self.browser.close()
 
     def run_flow_with_retries(self, max_retries: int = 3, level: int = 0) -> bool:
-        logger("Running flow with retries...", level=level)
+        print("  ")
+        logger("═" * 60, level=level)
+        logger("       🚀 STARTING FLOW WITH RETRIES", level=level)
+        logger(f"       Max Attempts: {max_retries}", level=level)
+        logger("═" * 60, level=level)
 
         for attempt in range(max_retries):
             try:
+                print("  ")
+                logger(f"─── Attempt {attempt + 1}/{max_retries} ───", level=level)
+                
                 if self.run_flow(level=level + 1):
                     return True
 
                 if attempt < max_retries - 1:
-                    logger(f"✗ Flow failed, retrying ({attempt + 1}/{max_retries})", level=level + 1)
+                    print("  ")
+                    logger(f"✗ Flow failed, preparing retry ({attempt + 1}/{max_retries})...", level=level + 1)
                     if self.use_tor:
+                        logger("🔄 Renewing Tor connection...", level=level + 1)
                         renew_tor(level=level + 1)
-                    time.sleep(random.uniform(5, 10))
+                    wait_time = random.uniform(5, 10)
+                    logger(f"⏳ Waiting {wait_time:.1f}s before next attempt...", level=level + 1)
+                    time.sleep(wait_time)
 
             except Exception as e:
                 if attempt < max_retries - 1:
-                    logger(
-                        f"✗ Flow error, retrying ({attempt + 1}/{max_retries}): {format_error(e)}",
-                        level=level + 1,
-                    )
+                    print("  ")
+                    logger(f"✗ Flow error: {format_error(e)}", level=level + 1)
+                    logger(f"   Preparing retry ({attempt + 1}/{max_retries})...", level=level + 1)
                     if self.use_tor:
+                        logger("🔄 Renewing Tor connection...", level=level + 1)
                         renew_tor(level=level + 1)
-                    time.sleep(random.uniform(5, 10))
+                    wait_time = random.uniform(5, 10)
+                    logger(f"⏳ Waiting {wait_time:.1f}s before next attempt...", level=level + 1)
+                    time.sleep(wait_time)
                 else:
-                    logger(f"✗ Flow failed after {max_retries} attempts: {format_error(e)}", level=level + 1)
+                    print("  ")
+                    logger("═" * 60, level=level)
+                    logger(f"✗ FLOW FAILED AFTER {max_retries} ATTEMPTS", level=level)
+                    logger(f"   Error: {format_error(e)}", level=level)
+                    logger("═" * 60, level=level)
 
+        print("  ")
+        logger("═" * 60, level=level)
+        logger(f"✗ ALL {max_retries} ATTEMPTS EXHAUSTED", level=level)
+        logger("═" * 60, level=level)
         return False
 
 
