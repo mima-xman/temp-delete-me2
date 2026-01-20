@@ -166,7 +166,7 @@ class GithubTMailorGenerator:
             prefix = random.choice(USERNAME_PREFIXES)
             
             # Random separator (hyphen, underscore, or none)
-            separators = ["-", "_", ""]
+            separators = ["-", ""]
             sep1 = random.choice(separators)
             sep2 = random.choice(separators)
             
@@ -194,7 +194,7 @@ class GithubTMailorGenerator:
             
             username = random.choice(patterns).lower()
             # Clean up double separators
-            username = username.replace("--", "-").replace("__", "_").replace("-_", "-").replace("_-", "_")
+            username = username.replace("--", "-")
 
             logger(f"✓ Generated username: {mask(username, 4)}", level=level + 1)
             return username
