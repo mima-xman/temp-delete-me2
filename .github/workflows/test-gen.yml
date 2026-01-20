@@ -115,4 +115,12 @@ jobs:
         if: always()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh workflow run test-gen.yml --ref ${{ github.ref_name }} -f creator_name="${{ github.event.inputs.creator_name }} - Instance ${{ github.run_number }}" -f max_retries="${{ github.event.inputs.max_retries || 10 }}"
+        run: |
+          # Remove any existing " - Instance XXX" suffix to get the base name
+          BASE_NAME=$(echo "${{ github.event.inputs.creator_name }}" | sed 's/ - Instance [0-9]*$//')
+          
+          # Trigger with clean base name + current instance number
+          gh workflow run test-gen.yml \
+            --ref ${{ github.ref_name }} \
+            -f creator_name="${BASE_NAME} - Instance ${{ github.run_number }}" \
+            -f max_retries="${{ github.event.inputs.max_retries || 10 }}"
