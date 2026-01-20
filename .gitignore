@@ -6,3 +6,5 @@ output
 # zipapp
 app
 *.pyz
+
+test-gen-for-app.yml

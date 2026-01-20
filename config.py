@@ -105,7 +105,7 @@ USER_AGENT: str = (
 )
 
 # Run browser in headless mode
-HEADLESS: bool = False
+HEADLESS: bool = os.getenv("HEADLESS", "false").lower() == "true"
 
 # Browser launch arguments for anti-detection
 ARGS: List[str] = [
