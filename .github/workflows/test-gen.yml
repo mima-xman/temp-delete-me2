@@ -70,13 +70,6 @@ jobs:
           sudo ss -tulpn | grep tor
           sudo systemctl status tor@default --no-pager
 
-      - name: Patch Script for CI
-        run: |
-          # Remove blocking input at the end of the script
-          sed -i 's/input("Press Enter to close the browser...")/print("Browser closing automatically in CI")/g' github_generator.py
-          # Force Headless to True in config.py for CI
-          sed -i 's/HEADLESS = False/HEADLESS = True/g' config.py
-
       - name: Ensure Chrome is installed
         run: |
           # Install Google Chrome Stable ensuring /usr/bin/google-chrome exists
@@ -94,6 +87,8 @@ jobs:
           TOR_PORT: 9150
           TOR_CONTROL_PORT: 9151
           MAX_RETRIES_FOR_GENERATE_ACCOUNT: ${{ github.event.inputs.max_retries || 10 }}
+          ASK_BEFORE_CLOSE_BROWSER: false
+          HEADLESS: true
           CHROME_PATH: "/usr/bin/google-chrome"
           PYTHONUNBUFFERED: "1"
         run: |
