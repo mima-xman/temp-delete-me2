@@ -6,3 +6,5 @@ output
 # zipapp
 zipapp
 *.pyz
+
+test.py

@@ -7,10 +7,12 @@ on:
         description: 'Creator Name'
         required: true
         default: 'Github Workflows (default name)'
+        type: string
       max_retries:
         description: 'Max Retries'
         required: true
         default: '10'
+        type: number
       email_service_name:
         description: 'Email Service Name'
         required: true
@@ -120,7 +122,7 @@ jobs:
           retention-days: 5
 
       - name: Trigger another run
-        if: ${{ github.event.inputs.trigger_another_run || true }}
+        if: ${{ github.event.inputs.trigger_another_run != 'false' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -133,4 +135,4 @@ jobs:
             -f email_service_name="${{ github.event.inputs.email_service_name || 'EmailOnDeck' }}" \
             -f use_tor_in_browser="${{ github.event.inputs.use_tor_in_browser || 'true' }}" \
             -f use_tor_in_mailservice="${{ github.event.inputs.use_tor_in_mailservice || 'true' }}" \
-            -f rerun_workflow="${{ github.event.inputs.rerun_workflow || 'true' }}"
+            -f trigger_another_run="${{ github.event.inputs.trigger_another_run || 'true' }}"
