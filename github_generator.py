@@ -33,7 +33,22 @@ from database import DatabaseManager
 from TempMailServices.EmailOnDeck import EmailOnDeck
 from utils import format_error, get_2fa_code, logger, renew_tor, mask
 
-load_dotenv()
+from pathlib import Path
+
+
+# Load environment variables from .env file
+# Check for .env in current directory first (for zipapp support)
+env_path = Path.cwd() / ".env"
+if env_path.exists():
+    load_dotenv(dotenv_path=env_path)
+else:
+    # Fallback to default discovery (for development)
+    try:
+        load_dotenv()
+    except AssertionError:
+        # Can happen in zipapp if .env is missing and finding logic fails
+        pass
+
 
 # ==============================================================================
 # GitHub Signup Constants
@@ -115,7 +130,7 @@ class AccountData:
     status: str = "pending"
 
 
-class GithubTMailorGenerator:
+class GithubGenerator:
     def __init__(self, use_tor: bool = False):
         self.use_tor = use_tor
 
@@ -1109,5 +1124,5 @@ class GithubTMailorGenerator:
 
 
 if __name__ == "__main__":
-    generator = GithubTMailorGenerator(use_tor=True)
+    generator = GithubGenerator(use_tor=True)
     generator.run_flow_with_retries(max_retries=MAX_RETRIES_FOR_GENERATE_ACCOUNT)
