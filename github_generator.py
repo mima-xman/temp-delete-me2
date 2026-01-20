@@ -1093,7 +1093,7 @@ class GithubGenerator:
                     logger(f"✗ Flow failed, preparing retry ({attempt + 1}/{max_retries})...", level=level + 1)
                     if self.use_tor:
                         logger("🔄 Renewing Tor connection...", level=level + 1)
-                        renew_tor(level=level + 1)
+                        _, self.ip = renew_tor(level=level + 1)
                     wait_time = random.uniform(5, 10)
                     logger(f"⏳ Waiting {wait_time:.1f}s before next attempt...", level=level + 1)
                     time.sleep(wait_time)
@@ -1105,7 +1105,7 @@ class GithubGenerator:
                     logger(f"   Preparing retry ({attempt + 1}/{max_retries})...", level=level + 1)
                     if self.use_tor:
                         logger("🔄 Renewing Tor connection...", level=level + 1)
-                        renew_tor(level=level + 1)
+                        _, self.ip = renew_tor(level=level + 1)
                     wait_time = random.uniform(5, 10)
                     logger(f"⏳ Waiting {wait_time:.1f}s before next attempt...", level=level + 1)
                     time.sleep(wait_time)
