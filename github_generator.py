@@ -30,7 +30,7 @@ from config import (
 )
 from playwright_helper import PlaywrightHelper
 from database import DatabaseManager
-from TempMailServices import EmailOnDeck, SmailPro, TempMailIO, TempMailOrg, TMailor
+from TempMailServices import EmailOnDeck, SmailPro, TempMailIO, TempMailOrg, TMailor, MailTM
 from utils import format_error, get_2fa_code, logger, renew_tor, mask
 
 from pathlib import Path
@@ -211,6 +211,7 @@ class GithubGenerator:
                 f"{first_name}{sep1}{prefix}{sep2}{last_name}{suffix}",
                 f"{prefix}{sep1}{first_name}{sep2}{last_name}{suffix}",
                 f"{first_name}{last_name}{suffix}",
+                f"{first_name}{last_name}",
             ]
             
             username = random.choice(patterns).lower()
@@ -258,12 +259,17 @@ class GithubGenerator:
                 self.email_service = TempMailOrg(use_tor=self.use_tor_in_mailservice)
             elif EMAIL_SERVICE_NAME == "TMailor":
                 self.email_service = TMailor(use_tor=self.use_tor_in_mailservice)
+            elif EMAIL_SERVICE_NAME == "MailTM":
+                self.email_service = MailTM(use_tor=self.use_tor_in_mailservice)
             else:
                 logger(f"✗ Invalid email service name: {EMAIL_SERVICE_NAME}", level=level + 1)
                 logger(f"✓ Using email service: EmailOnDeck", level=level + 1)
                 self.email_service = EmailOnDeck(use_tor=self.use_tor_in_mailservice)
 
-            result = self.email_service.generate_email(level=level + 1)
+            result = self.email_service.generate_email(
+                username=self.account_data.username,
+                level=level + 1
+            )
 
             if not result or not result.get("email"):
                 logger("✗ Failed to generate email address", level=level + 1)

@@ -7,6 +7,7 @@ Available services:
 - TempMailIO: temp-mail.io API
 - TempMailOrg: temp-mail.org API
 - TMailor: tmailor.com API
+- MailTM: mail.tm API
 
 All services share a common interface:
 - generate_email() -> dict with 'email' and 'token' keys
@@ -20,6 +21,7 @@ from .SmailPro import SmailPro
 from .TempMailIO import TempMailIO
 from .TempMailOrg import TempMailOrg
 from .TMailor import TMailor
+from .MailTM import MailTM
 
 __all__ = [
     'EmailOnDeck',
@@ -27,4 +29,5 @@ __all__ = [
     'TempMailIO',
     'TempMailOrg',
     'TMailor',
+    'MailTM',
 ]

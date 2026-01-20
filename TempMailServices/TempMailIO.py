@@ -151,7 +151,7 @@ class TempMailIO:
         self,
         min_length: int = 10,
         max_length: int = 10,
-        custom_name: Optional[str] = None,
+        username: Optional[str] = None,
         level: int = 0
     ) -> Optional[Dict[str, str]]:
         """
@@ -160,14 +160,14 @@ class TempMailIO:
         Args:
             min_length: Minimum name length.
             max_length: Maximum name length.
-            custom_name: Optional custom name (uses generate_custom_email).
+            username: Optional custom name.
             level: Logging indentation level.
 
         Returns:
             Dictionary with 'email' and 'token' keys, or None on failure.
         """
-        if custom_name:
-            return self.generate_custom_email(custom_name, level=level)
+        if username:
+            return self.generate_custom_email(username, level=level)
 
         logger("[######] Generating new email...", level=level)
 

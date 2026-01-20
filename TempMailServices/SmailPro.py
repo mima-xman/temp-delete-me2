@@ -210,11 +210,16 @@ class SmailPro:
         logger("⚠ Payload expired, refreshing...", level=level)
         return self._refresh_payload(level=level)
 
-    def generate_email(self, level: int = 0) -> Optional[Dict[str, str]]:
+    def generate_email(
+        self, 
+        username: Optional[str] = None, 
+        level: int = 0
+    ) -> Optional[Dict[str, str]]:
         """
         Generate a new temporary email address.
 
         Args:
+            username: Optional custom name.
             level: Logging indentation level.
 
         Returns:
