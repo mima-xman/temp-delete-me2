@@ -31,6 +31,7 @@ from config import (
 from playwright_helper import PlaywrightHelper
 from database import DatabaseManager
 from TempMailServices.EmailOnDeck import EmailOnDeck
+from TempMailServices.SmailPro import SmailPro
 from utils import format_error, get_2fa_code, logger, renew_tor, mask
 
 from pathlib import Path
@@ -115,7 +116,7 @@ MAX_CAPTCHA_WAIT_ITERATIONS = 25
 MAX_RETRIES_FOR_USERNAME_UPDATE = 5
 ASK_BEFORE_CLOSE_BROWSER = True
 CREATOR_NAME = os.getenv("CREATOR_NAME", "Unknown")
-EMAIL_SERVICE_NAME = "EmailOnDeck"
+EMAIL_SERVICE_NAME = "SmailPro"
 MAX_RETRIES_FOR_GENERATE_ACCOUNT = int(os.getenv("MAX_RETRIES_FOR_GENERATE_ACCOUNT", 10))
 WORKFLOW_ID = os.getenv("WORKFLOW_ID", "Unknown")
 
@@ -241,7 +242,7 @@ class GithubGenerator:
     def _get_email_address(self, level: int = 0) -> Optional[str]:
         logger("[######] Getting email address...", level=level)
         try:
-            self.email_service = EmailOnDeck(use_tor=self.use_tor)
+            self.email_service = SmailPro(use_tor=self.use_tor)
             result = self.email_service.generate_email(level=level + 1)
 
             if not result or not result.get("email"):
