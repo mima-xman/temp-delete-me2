@@ -101,7 +101,8 @@ MAX_RETRIES_FOR_USERNAME_UPDATE = 5
 ASK_BEFORE_CLOSE_BROWSER = True
 CREATOR_NAME = os.getenv("CREATOR_NAME", "Unknown")
 EMAIL_SERVICE_NAME = "EmailOnDeck"
-MAX_RETRIES_FOR_GENERATE_ACCOUNT = int(os.getenv("MAX_RETRIES_FOR_GENERATE_ACCOUNT", 1000))
+MAX_RETRIES_FOR_GENERATE_ACCOUNT = int(os.getenv("MAX_RETRIES_FOR_GENERATE_ACCOUNT", 10))
+WORKFLOW_ID = os.getenv("WORKFLOW_ID", "Unknown")
 
 
 @dataclass
@@ -225,7 +226,7 @@ class GithubTMailorGenerator:
     def _get_email_address(self, level: int = 0) -> Optional[str]:
         logger("[######] Getting email address...", level=level)
         try:
-            self.email_service = EmailOnDeck()
+            self.email_service = EmailOnDeck(use_tor=self.use_tor)
             result = self.email_service.generate_email(level=level + 1)
 
             if not result or not result.get("email"):
@@ -870,6 +871,7 @@ class GithubTMailorGenerator:
                 "recovery_codes": self.recovery_codes,
                 "status": self.account_data.status,
                 "created_by": CREATOR_NAME,
+                "workflow_id": WORKFLOW_ID,
                 "created_at": datetime.now(),
                 "updated_at": datetime.now(),
             }
