@@ -30,7 +30,7 @@ from config import (
 )
 from playwright_helper import PlaywrightHelper
 from database import DatabaseManager
-from TempMailServices import EmailOnDeck, SmailPro, TempMailIO, TempMailOrg, TMailor, MailTM
+from TempMailServices import EmailOnDeck, MailTM, SmailPro, TempMailIO, TempMailOrg, TMailor
 from utils import format_error, get_2fa_code, logger, renew_tor, mask
 
 from pathlib import Path
@@ -251,6 +251,8 @@ class GithubGenerator:
             logger(f"✓ Using email service: {EMAIL_SERVICE_NAME}", level=level + 1)
             if EMAIL_SERVICE_NAME == "EmailOnDeck":
                 self.email_service = EmailOnDeck(use_tor=self.use_tor_in_mailservice)
+            elif EMAIL_SERVICE_NAME == "MailTM":
+                self.email_service = MailTM(use_tor=self.use_tor_in_mailservice)
             elif EMAIL_SERVICE_NAME == "SmailPro":
                 self.email_service = SmailPro(use_tor=self.use_tor_in_mailservice)
             elif EMAIL_SERVICE_NAME == "TempMailIO":
@@ -259,8 +261,6 @@ class GithubGenerator:
                 self.email_service = TempMailOrg(use_tor=self.use_tor_in_mailservice)
             elif EMAIL_SERVICE_NAME == "TMailor":
                 self.email_service = TMailor(use_tor=self.use_tor_in_mailservice)
-            elif EMAIL_SERVICE_NAME == "MailTM":
-                self.email_service = MailTM(use_tor=self.use_tor_in_mailservice)
             else:
                 logger(f"✗ Invalid email service name: {EMAIL_SERVICE_NAME}", level=level + 1)
                 logger(f"✓ Using email service: EmailOnDeck", level=level + 1)

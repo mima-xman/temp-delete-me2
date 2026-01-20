@@ -20,11 +20,11 @@ on:
         type: choice
         options:
           - EmailOnDeck
+          - MailTM
           - SmailPro
           - TempMailIO
           - TempMailOrg
           - TMailor
-          - MailTM
       use_tor_in_browser:
         description: 'Use TOR in browser'
         required: true
