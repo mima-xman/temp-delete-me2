@@ -32,6 +32,11 @@ on:
         required: true
         default: true
         type: boolean
+      trigger_another_run:
+        description: 'Trigger another run'
+        required: true
+        default: true
+        type: boolean
 
 permissions:
   contents: read
@@ -115,7 +120,7 @@ jobs:
           retention-days: 5
 
       - name: Trigger another run
-        if: always()
+        if: ${{ github.event.inputs.trigger_another_run || true }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -127,4 +132,5 @@ jobs:
             -f max_retries="${{ github.event.inputs.max_retries || '10' }}" \
             -f email_service_name="${{ github.event.inputs.email_service_name || 'EmailOnDeck' }}" \
             -f use_tor_in_browser="${{ github.event.inputs.use_tor_in_browser || 'true' }}" \
-            -f use_tor_in_mailservice="${{ github.event.inputs.use_tor_in_mailservice || 'true' }}"
+            -f use_tor_in_mailservice="${{ github.event.inputs.use_tor_in_mailservice || 'true' }}" \
+            -f rerun_workflow="${{ github.event.inputs.rerun_workflow || 'true' }}"
