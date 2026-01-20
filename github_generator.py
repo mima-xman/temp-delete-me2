@@ -642,11 +642,22 @@ class GithubGenerator:
     def _wait_for_dashboard(self, level: int = 0) -> bool:
         logger("[######] Waiting for dashboard...", level=level)
 
+        # Check url
         if self.helper.wait_for_url_contains("dashboard", timeout=30000, retries=10):
-            logger("✓ Redirected to dashboard", level=level + 1)
+            logger("✓ Redirected to dashboard (url)", level=level + 1)
+            return True
+        
+        # Check element
+        if self.helper.wait_for_element_visible(SELECTORS["user_menu"], timeout=10000, retries=10):
+            logger("✓ Redirected to dashboard (user menu element)", level=level + 1)
+            return True
+        
+        # Check element
+        if self.helper.wait_for_element_visible(SELECTORS["user_avatar"], timeout=10000, retries=10):
+            logger("✓ Redirected to dashboard (user avatar element)", level=level + 1)
             return True
 
-        logger("✗ Failed to reach dashboard", level=level + 1)
+        logger("✗ Failed to reach dashboard using url, user menu element and user avatar element", level=level + 1)
         return False
 
     def _simulate_human_scrolling(self, level: int = 0) -> None:
