@@ -4,7 +4,4 @@ __pycache__/
 output
 
 # zipapp
-app
-*.pyz
-
-test-gen-for-app.yml
+zipapp
