@@ -120,7 +120,8 @@ class EmailOnDeck:
                 if "Too many" in text or text.startswith("err:"):
                     if self.use_tor and attempt < self.max_retries - 1:
                         logger(f"⚠ Rate limit hit. Renewing Tor IP... ({attempt + 1}/{self.max_retries})", level=level)
-                        if renew_tor(level=level):
+                        renewed, ip = renew_tor(level=level)
+                        if renewed:
                             self._init_session()
                             continue
                     return None
@@ -136,7 +137,8 @@ class EmailOnDeck:
 
                     if self.use_tor:
                         logger(f"🔄 Renewing Tor IP... ({attempt + 1}/{self.max_retries})", level=level)
-                        if renew_tor(level=level):
+                        renewed, ip = renew_tor(level=level)
+                        if renewed:
                             self._init_session()
 
         return None

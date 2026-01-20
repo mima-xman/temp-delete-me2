@@ -1,5 +1,5 @@
 """
-TempMailExtension temporary email service integration.
+TempMailOrg temporary email service integration.
 
 Website: https://temp-mail.org
 Features: curl_cffi for Cloudflare bypass, Tor support
@@ -10,14 +10,15 @@ import time
 from typing import Any, Dict, List, Optional
 
 from curl_cffi import requests
+import cloudscraper
 
 from config import TOR_PORT
-from utils import format_error, logger
+from utils import format_error, logger, mask, renew_tor
 
 
-class TempMailExtensionAPI:
+class TempMailOrg:
     """
-    TempMail Extension API client.
+    TempMailOrg API client.
 
     Uses curl_cffi to bypass Cloudflare protection.
 
@@ -33,7 +34,7 @@ class TempMailExtensionAPI:
         use_tor: bool = False
     ):
         """
-        Initialize TempMailExtension client.
+        Initialize TempMailOrg client.
 
         Args:
             token: Optional existing token for session restoration.
@@ -44,6 +45,9 @@ class TempMailExtensionAPI:
         self.email: Optional[str] = None
         self.session = requests.Session()
         self.use_tor = use_tor
+        self.scraper = cloudscraper.create_scraper(
+            browser={'browser': 'chrome', 'mobile': False}
+        )
         self.proxies = {}
 
         if use_tor:
@@ -76,6 +80,7 @@ class TempMailExtensionAPI:
         method: str,
         url: str,
         max_retries: int = 3,
+        level: int = 0,
         **kwargs: Any
     ) -> Optional[requests.Response]:
         """
@@ -85,6 +90,7 @@ class TempMailExtensionAPI:
             method: HTTP method ('GET' or 'POST').
             url: Request URL.
             max_retries: Maximum retry attempts.
+            level: Logging indentation level.
             **kwargs: Additional request arguments.
 
         Returns:
@@ -93,38 +99,49 @@ class TempMailExtensionAPI:
         for attempt in range(max_retries):
             try:
                 if method == "GET":
-                    response = self.session.get(url, **kwargs)
+                    response = self.scraper.get(url, **kwargs)
                 else:
-                    response = self.session.post(url, **kwargs)
+                    response = self.scraper.post(url, **kwargs)
 
                 if response.status_code == 200:
                     return response
 
-                # Rate limit - wait and retry
-                if response.status_code == 429:
-                    wait_time = (attempt + 1) * 5
-                    logger(f"⚠ Rate limited. Waiting {wait_time}s before retry {attempt + 1}/{max_retries}...")
-                    time.sleep(wait_time)
-                    continue
-
-                # Cloudflare block - wait longer
-                if response.status_code == 403:
-                    if attempt < max_retries - 1:
-                        wait_time = (attempt + 1) * 10
-                        logger(f"⚠ Blocked (403). Waiting {wait_time}s before retry {attempt + 1}/{max_retries}...")
+                if attempt < max_retries - 1:
+                    # Rate limit - wait and retry
+                    if response.status_code == 429:
+                        wait_time = (attempt + 1) * 5
+                        logger(f"⚠ Rate limited. Waiting {wait_time}s before retry {attempt + 1}/{max_retries}...", level=level)
                         time.sleep(wait_time)
+                        
+                        if self.use_tor:
+                            logger(f"🔄 Renewing Tor IP... ({attempt + 1}/{max_retries})", level=level)
+                            renewed, ip = renew_tor(level=level)
+                        
                         continue
-                    return response
 
-                return response
+                    # Cloudflare block - wait longer
+                    if response.status_code == 403:
+                        wait_time = (attempt + 1) * 10
+                        logger(f"⚠ Blocked (403). Waiting {wait_time}s before retry {attempt + 1}/{max_retries}...", level=level)
+                        time.sleep(wait_time)
+                        
+                        if self.use_tor:
+                            logger(f"🔄 Renewing Tor IP... ({attempt + 1}/{max_retries})", level=level)
+                            renewed, ip = renew_tor(level=level)
+                            
+                        continue
+
+                return None
 
             except Exception as e:
                 if attempt < max_retries - 1:
                     wait_time = (attempt + 1) * 3
-                    logger(f"⚠ Request error: {str(e)[:50]}. Retrying in {wait_time}s...")
+                    logger(f"⚠ Request error: {str(e)[:50]}. Retrying in {wait_time}s...", level=level)
                     time.sleep(wait_time)
-                else:
-                    raise
+
+                    if self.use_tor:
+                        logger(f"🔄 Renewing Tor IP... ({attempt + 1}/{max_retries})", level=level)
+                        renewed, ip = renew_tor(level=level)
 
         return None
 
@@ -147,7 +164,8 @@ class TempMailExtensionAPI:
                 f"{self.base_url}/mailbox",
                 headers=self._get_headers(),
                 proxies=self.proxies,
-                timeout=15
+                timeout=15,
+                level=level + 1
             )
 
             if response and response.status_code == 200:
@@ -155,8 +173,8 @@ class TempMailExtensionAPI:
                 self.token = data['token']
                 self.email = data['mailbox']
 
-                logger(f"✅ Email: {self.email}", level=level)
-                logger(f"✅ Token: {self.token[:50]}...", level=level)
+                logger(f"✅ Email: {mask(self.email, 4)}", level=level)
+                logger(f"✅ Token: {mask(self.token, 4)}", level=level)
 
                 return {
                     'email': self.email,
@@ -194,7 +212,8 @@ class TempMailExtensionAPI:
                 headers=self._get_headers(),
                 impersonate="chrome110",
                 proxies=self.proxies,
-                timeout=15
+                timeout=15,
+                level=level + 1
             )
 
             if response and response.status_code == 200:
@@ -246,12 +265,13 @@ class TempMailExtensionAPI:
                 headers=self._get_headers(),
                 impersonate="chrome110",
                 proxies=self.proxies,
-                timeout=15
+                timeout=15,
+                level=level + 1
             )
 
             if response and response.status_code == 200:
                 data = response.json()
-                logger(f"📧 Retrieved email: {message_id}", level=level)
+                logger(f"📧 Retrieved email: {mask(message_id, 4)}", level=level)
                 return data
             elif response:
                 logger(f"✗ Error {response.status_code}: {response.text[:200]}", level=level)
@@ -326,11 +346,11 @@ class TempMailExtensionAPI:
 
     def close(self) -> None:
         """Close the HTTP session."""
-        self.session.close()
+        self.scraper.close()
 
 
 if __name__ == "__main__":
-    api = TempMailExtensionAPI(token=None, use_tor=False)
+    api = TempMailOrg(token=None, use_tor=False)
 
     try:
         result = api.generate_email()

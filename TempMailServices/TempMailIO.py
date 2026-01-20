@@ -11,10 +11,10 @@ from typing import Any, Dict, List, Optional
 import requests
 
 from config import TOR_PORT
-from utils import format_error, logger
+from utils import format_error, logger, mask, renew_tor
 
 
-class TempMailIOAPI:
+class TempMailIO:
     """
     TempMail.io API client.
 
@@ -26,18 +26,21 @@ class TempMailIOAPI:
 
     body_key = "body_html"
 
-    def __init__(self, use_tor: bool = True):
+    def __init__(self, use_tor: bool = True, max_retries: int = 5):
         """
         Initialize TempMail.io client.
 
         Args:
             use_tor: Route requests through Tor network.
+            max_retries: Maximum retry attempts.
         """
         self.base_url = "https://temp-mail.io"
         self.api_url = "https://api.internal.temp-mail.io/api/v3"
         self.api_url_v4 = "https://api.internal.temp-mail.io/api/v4"
         self.email: Optional[str] = None
         self.token: Optional[str] = None
+        self.max_retries = max_retries
+        self.use_tor = use_tor
         self.session = requests.Session()
 
         self.proxies = {}
@@ -60,9 +63,6 @@ class TempMailIOAPI:
             'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36',
             'x-cors-header': 'iaWg3pchvFx48fY'
         })
-
-        logger("🚀 Initializing TempMailIOAPI...", level=0)
-        logger("✅ API ready", level=0)
 
     def close(self) -> None:
         """Close the HTTP session."""
@@ -93,16 +93,37 @@ class TempMailIOAPI:
         """
         try:
             url = endpoint if endpoint.startswith('http') else f"{self.api_url}{endpoint}"
-            response = self.session.request(method, url, proxies=self.proxies, **kwargs)
+            
+            for attempt in range(self.max_retries):
+                try:
+                    response = self.session.request(method, url, proxies=self.proxies, **kwargs)
 
-            if not response.ok:
-                logger(f"✗ Error {response.status_code}: {response.text[:200]}", level=level)
-                return None
+                    if response.ok:
+                        return response.json()
+                    
+                    logger(f"✗ Error {response.status_code}: {response.text[:200]}", level=level)
 
-            return response.json()
+                    # Handle rate limits or errors
+                    if self.use_tor and attempt < self.max_retries - 1:
+                        logger(f"⚠ Request failed. Renewing Tor IP... ({attempt + 1}/{self.max_retries})", level=level)
+                        renewed, ip = renew_tor(level=level)
+                        continue
+
+                except Exception as e:
+                    logger(f"✗ Request failed: {format_error(e)}", level=level)
+                    if attempt < self.max_retries - 1:
+                        wait_time = (attempt + 1) * 2
+                        logger(f"⏳ Waiting {wait_time}s before retry...", level=level)
+                        time.sleep(wait_time)
+
+                        if self.use_tor:
+                            logger(f"🔄 Renewing Tor IP... ({attempt + 1}/{self.max_retries})", level=level)
+                            renewed, ip = renew_tor(level=level)
+            
+            return None
 
         except Exception as e:
-            logger(f"✗ Request failed: {format_error(e)}", level=level)
+            logger(f"✗ Fatal error: {format_error(e)}", level=level)
             return None
 
     def get_domains(self, level: int = 0) -> Optional[List[Dict[str, Any]]]:
@@ -166,8 +187,8 @@ class TempMailIOAPI:
             self.email = data['email']
             self.token = data['token']
 
-            logger(f"✅ Email: {self.email}", level=level + 1)
-            logger(f"✅ Token: {self.token}", level=level + 1)
+            logger(f"✅ Email: {mask(self.email, 4)}", level=level + 1)
+            logger(f"✅ Token: {mask(self.token, 4)}", level=level + 1)
 
             return {
                 'email': self.email,
@@ -220,8 +241,8 @@ class TempMailIOAPI:
             self.email = data['email']
             self.token = data['token']
 
-            logger(f"✅ Email: {self.email}", level=level + 1)
-            logger(f"✅ Token: {self.token}", level=level + 1)
+            logger(f"✅ Email: {mask(self.email, 4)}", level=level + 1)
+            logger(f"✅ Token: {mask(self.token, 4)}", level=level + 1)
 
             return {
                 'email': self.email,
@@ -291,7 +312,7 @@ class TempMailIOAPI:
         )
 
         if data and 'id' in data:
-            logger(f"📧 Retrieved email: {email_id}", level=level)
+            logger(f"📧 Retrieved email: {mask(email_id, 4)}", level=level)
             return data
 
         return None

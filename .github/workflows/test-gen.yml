@@ -1,19 +1,37 @@
 name: Test Gen
 
 on:
-  # push:
-  #   branches:
-  #     - main
   workflow_dispatch:
-   inputs:
-    creator_name:
-      description: 'Creator Name'
-      required: true
-      default: 'Github Workflows (default name)'
-    max_retries:
-      description: 'Max Retries'
-      required: true
-      default: '10'
+    inputs:
+      creator_name:
+        description: 'Creator Name'
+        required: true
+        default: 'Github Workflows (default name)'
+      max_retries:
+        description: 'Max Retries'
+        required: true
+        default: '10'
+      email_service_name:
+        description: 'Email Service Name'
+        required: true
+        default: 'EmailOnDeck'
+        type: choice
+        options:
+          - EmailOnDeck
+          - SmailPro
+          - TempMailIO
+          - TempMailOrg
+          - TMailor
+      use_tor_in_browser:
+        description: 'Use TOR in browser'
+        required: true
+        default: true
+        type: boolean
+      use_tor_in_mailservice:
+        description: 'Use TOR in mail service'
+        required: true
+        default: true
+        type: boolean
 
 permissions:
   contents: read
@@ -22,10 +40,6 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-#     strategy:
-#       matrix:
-#         instance: [1, 2, 3, 4, 5, 6]
-#       fail-fast: false
     name: Test Instance
     
     steps:
@@ -44,7 +58,6 @@ jobs:
           pip install -r requirements.txt
           pip install git+https://${{ secrets.PLAYWRIGHT_HELPER_GITHUB_TOKEN }}@github.com/za-zo/python-package--playwright-helper.git
           playwright install chrome
-          # Install xvfb for headed mode support if needed
           sudo apt-get install -y xvfb
       
       - name: Install Tor
@@ -54,25 +67,17 @@ jobs:
       
       - name: Configure Tor
         run: |
-          # Configure Tor to match script defaults (9150/9151)
           echo "ControlPort 9151" | sudo tee -a /etc/tor/torrc
           echo "SocksPort 9150" | sudo tee -a /etc/tor/torrc
           echo "CookieAuthentication 0" | sudo tee -a /etc/tor/torrc
           echo "Log notice file /var/log/tor/log" | sudo tee -a /etc/tor/torrc
-          
-          # Restart Tor service to apply changes
           sudo systemctl restart tor@default
-          
-          # Wait for Tor to be ready
           sleep 10
-          
-          # Check status
           sudo ss -tulpn | grep tor
           sudo systemctl status tor@default --no-pager
 
       - name: Ensure Chrome is installed
         run: |
-          # Install Google Chrome Stable ensuring /usr/bin/google-chrome exists
           wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
           sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list'
           sudo apt-get update
@@ -89,10 +94,12 @@ jobs:
           MAX_RETRIES_FOR_GENERATE_ACCOUNT: ${{ github.event.inputs.max_retries || 10 }}
           ASK_BEFORE_CLOSE_BROWSER: false
           HEADLESS: true
+          EMAIL_SERVICE_NAME: ${{ github.event.inputs.email_service_name || 'EmailOnDeck' }}
+          USE_TOR_IN_BROWSER: ${{ github.event.inputs.use_tor_in_browser }}
+          USE_TOR_IN_MAILSERVICE: ${{ github.event.inputs.use_tor_in_mailservice }}
           CHROME_PATH: "/usr/bin/google-chrome"
           PYTHONUNBUFFERED: "1"
         run: |
-          # Run with xvfb just in case, though we patched HEADLESS=True
           xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" python github_generator.py
       
       - name: Upload Artifacts
@@ -112,11 +119,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Remove any existing " - Instance XXX" suffix to get the base name
           BASE_NAME=$(echo "${{ github.event.inputs.creator_name }}" | sed 's/ - Instance [0-9]*$//')
           
-          # Trigger with clean base name + current instance number
           gh workflow run test-gen.yml \
             --ref ${{ github.ref_name }} \
             -f creator_name="${BASE_NAME} - Instance ${{ github.run_number }}" \
-            -f max_retries="${{ github.event.inputs.max_retries || 10 }}"
+            -f max_retries="${{ github.event.inputs.max_retries || '10' }}" \
+            -f email_service_name="${{ github.event.inputs.email_service_name || 'EmailOnDeck' }}" \
+            -f use_tor_in_browser="${{ github.event.inputs.use_tor_in_browser || 'true' }}" \
+            -f use_tor_in_mailservice="${{ github.event.inputs.use_tor_in_mailservice || 'true' }}"

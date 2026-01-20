@@ -11,10 +11,10 @@ from typing import Any, Dict, List, Optional
 import cloudscraper
 
 from config import TOR_PORT
-from utils import format_error, logger
+from utils import format_error, logger, mask, renew_tor
 
 
-class TMailorAPI:
+class TMailor:
     """
     TMailor temporary email service client.
 
@@ -29,7 +29,8 @@ class TMailorAPI:
     def __init__(
         self,
         access_token: Optional[str] = None,
-        use_tor: bool = False
+        use_tor: bool = False,
+        max_retries: int = 5
     ):
         """
         Initialize TMailor client.
@@ -37,11 +38,14 @@ class TMailorAPI:
         Args:
             access_token: Optional existing access token for session restoration.
             use_tor: Route requests through Tor network.
+            max_retries: Maximum retry attempts.
         """
         self.base_url = "https://tmailor.com"
         self.api_url = f"{self.base_url}/api"
         self.access_token = access_token
+        self.max_retries = max_retries
         self.email: Optional[str] = None
+        self.use_tor = use_tor
 
         self.proxies = {}
         if use_tor:
@@ -86,21 +90,44 @@ class TMailorAPI:
         }
 
         try:
-            response = self.scraper.post(
-                self.api_url,
-                json=payload,
-                headers=headers,
-                proxies=self.proxies
-            )
+            for attempt in range(self.max_retries):
+                try:
+                    response = self.scraper.post(
+                        self.api_url,
+                        json=payload,
+                        headers=headers,
+                        proxies=self.proxies
+                    )
 
-            if response.status_code == 200:
-                return response.json()
-            else:
-                logger(f"✗ Error {response.status_code}: {response.text[:200]}", level=level)
-                return None
+                    if response.status_code == 200:
+                        return response.json()
+                    
+                    logger(f"✗ Error {response.status_code}: {response.text[:200]}", level=level)
+                    
+                    if self.use_tor and attempt < self.max_retries - 1:
+                        logger(f"⚠ Request failed. Renewing Tor IP... ({attempt + 1}/{self.max_retries})", level=level)
+                        renewed, ip = renew_tor(level=level)
+                        if renewed:
+                            # Re-create scraper to ensure fresh state if needed, though proxies dict is same
+                            # But cloudscraper might need reset? Keeping it simple for now, just renew IP.
+                            pass
+                        continue
+                        
+                except Exception as e:
+                    logger(f"✗ Request failed: {format_error(e)}", level=level)
+                    if attempt < self.max_retries - 1:
+                        wait_time = (attempt + 1) * 2
+                        logger(f"⏳ Waiting {wait_time}s before retry...", level=level)
+                        time.sleep(wait_time)
+
+                        if self.use_tor:
+                            logger(f"🔄 Renewing Tor IP... ({attempt + 1}/{self.max_retries})", level=level)
+                            renewed, ip = renew_tor(level=level)
+            
+            return None
 
         except Exception as e:
-            logger(f"✗ Request failed: {format_error(e)}", level=level)
+            logger(f"✗ Fatal error: {format_error(e)}", level=level)
             return None
 
     def generate_email(self, level: int = 0) -> Optional[Dict[str, Any]]:
@@ -120,8 +147,8 @@ class TMailorAPI:
             self.access_token = data['accesstoken']
             self.email = data['email']
 
-            logger(f"✅ Email: {self.email}", level=level + 1)
-            logger(f"✅ Token: {self.access_token[:50]}...", level=level + 1)
+            logger(f"✅ Email: {mask(self.email, 4)}", level=level + 1)
+            logger(f"✅ Token: {mask(self.access_token, 4)}", level=level + 1)
 
             return {
                 'email': self.email,
@@ -198,7 +225,7 @@ class TMailorAPI:
         )
 
         if data and data.get('msg') == 'ok':
-            logger(f"📧 Retrieved email: {email_id}", level=level)
+            logger(f"📧 Retrieved email: {mask(email_id, 4)}", level=level)
             return data.get('data')
 
         return None

@@ -137,7 +137,8 @@ class SmailPro:
 
                     if self.use_tor:
                         logger(f"🔄 Renewing Tor IP... ({attempt + 1}/{self.max_retries})", level=level)
-                        if renew_tor(level=level):
+                        renewed, ip = renew_tor(level=level)
+                        if renewed:
                             self._init_session()
 
         return None

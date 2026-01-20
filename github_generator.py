@@ -30,7 +30,7 @@ from config import (
 )
 from playwright_helper import PlaywrightHelper
 from database import DatabaseManager
-from TempMailServices.EmailOnDeck import EmailOnDeck
+from TempMailServices import EmailOnDeck, SmailPro, TempMailIO, TempMailOrg, TMailor
 from utils import format_error, get_2fa_code, logger, renew_tor, mask
 
 from pathlib import Path
@@ -115,9 +115,11 @@ MAX_CAPTCHA_WAIT_ITERATIONS = 25
 MAX_RETRIES_FOR_USERNAME_UPDATE = 5
 ASK_BEFORE_CLOSE_BROWSER = (os.getenv("ASK_BEFORE_CLOSE_BROWSER", "true")).lower() == "true"
 CREATOR_NAME = os.getenv("CREATOR_NAME", "Unknown")
-EMAIL_SERVICE_NAME = "EmailOnDeck"
+EMAIL_SERVICE_NAME = os.getenv("EMAIL_SERVICE_NAME", "EmailOnDeck")
 MAX_RETRIES_FOR_GENERATE_ACCOUNT = int(os.getenv("MAX_RETRIES_FOR_GENERATE_ACCOUNT", 10))
 WORKFLOW_ID = os.getenv("WORKFLOW_ID", "Unknown")
+USE_TOR_IN_BROWSER = (os.getenv("USE_TOR_IN_BROWSER", "true")).lower() == "true"
+USE_TOR_IN_MAILSERVICE = (os.getenv("USE_TOR_IN_MAILSERVICE", "true")).lower() == "true"
 
 
 @dataclass
@@ -131,8 +133,9 @@ class AccountData:
 
 
 class GithubGenerator:
-    def __init__(self, use_tor: bool = False):
-        self.use_tor = use_tor
+    def __init__(self, use_tor_in_browser: bool = False, use_tor_in_mailservice: bool = False):
+        self.use_tor_in_browser = use_tor_in_browser
+        self.use_tor_in_mailservice = use_tor_in_mailservice
 
         self.playwright = None
         self.browser = None
@@ -153,10 +156,13 @@ class GithubGenerator:
         logger(f"TOR Control Port: {TOR_CONTROL_PORT}", level=1)
 
         self._init_output_dirs()
+        
+        if self.use_tor_in_browser:
+            logger("Using TOR network for browser", level=1)
 
-        if self.use_tor:
+        if self.use_tor_in_mailservice:
             logger("Using TOR network for emails...", level=1)
-            _, self.ip = renew_tor(level=1)
+        
 
     # --------------------------------------------------------------------------
     # Init / dirs
@@ -241,7 +247,22 @@ class GithubGenerator:
     def _get_email_address(self, level: int = 0) -> Optional[str]:
         logger("[######] Getting email address...", level=level)
         try:
-            self.email_service = EmailOnDeck(use_tor=self.use_tor)
+            logger(f"✓ Using email service: {EMAIL_SERVICE_NAME}", level=level + 1)
+            if EMAIL_SERVICE_NAME == "EmailOnDeck":
+                self.email_service = EmailOnDeck(use_tor=self.use_tor_in_mailservice)
+            elif EMAIL_SERVICE_NAME == "SmailPro":
+                self.email_service = SmailPro(use_tor=self.use_tor_in_mailservice)
+            elif EMAIL_SERVICE_NAME == "TempMailIO":
+                self.email_service = TempMailIO(use_tor=self.use_tor_in_mailservice)
+            elif EMAIL_SERVICE_NAME == "TempMailOrg":
+                self.email_service = TempMailOrg(use_tor=self.use_tor_in_mailservice)
+            elif EMAIL_SERVICE_NAME == "TMailor":
+                self.email_service = TMailor(use_tor=self.use_tor_in_mailservice)
+            else:
+                logger(f"✗ Invalid email service name: {EMAIL_SERVICE_NAME}", level=level + 1)
+                logger(f"✓ Using email service: EmailOnDeck", level=level + 1)
+                self.email_service = EmailOnDeck(use_tor=self.use_tor_in_mailservice)
+
             result = self.email_service.generate_email(level=level + 1)
 
             if not result or not result.get("email"):
@@ -264,7 +285,7 @@ class GithubGenerator:
         try:
             launch_kwargs = {"headless": HEADLESS, "args": ARGS}
 
-            if self.use_tor:
+            if self.use_tor_in_browser:
                 tor_proxy = f"socks5://127.0.0.1:{TOR_PORT}"
                 launch_kwargs["proxy"] = {"server": tor_proxy}
                 logger(f"Using Tor proxy: {tor_proxy}", level=level + 1)
@@ -1102,7 +1123,7 @@ class GithubGenerator:
                 if attempt < max_retries - 1:
                     print("  ")
                     logger(f"✗ Flow failed, preparing retry ({attempt + 1}/{max_retries})...", level=level + 1)
-                    if self.use_tor:
+                    if self.use_tor_in_browser:
                         logger("🔄 Renewing Tor connection...", level=level + 1)
                         _, self.ip = renew_tor(level=level + 1)
                     wait_time = random.uniform(5, 10)
@@ -1114,7 +1135,7 @@ class GithubGenerator:
                     print("  ")
                     logger(f"✗ Flow error: {format_error(e)}", level=level + 1)
                     logger(f"   Preparing retry ({attempt + 1}/{max_retries})...", level=level + 1)
-                    if self.use_tor:
+                    if self.use_tor_in_browser:
                         logger("🔄 Renewing Tor connection...", level=level + 1)
                         _, self.ip = renew_tor(level=level + 1)
                     wait_time = random.uniform(5, 10)
@@ -1135,5 +1156,5 @@ class GithubGenerator:
 
 
 if __name__ == "__main__":
-    generator = GithubGenerator(use_tor=True)
+    generator = GithubGenerator(use_tor_in_browser=USE_TOR_IN_BROWSER, use_tor_in_mailservice=USE_TOR_IN_MAILSERVICE)
     generator.run_flow_with_retries(max_retries=MAX_RETRIES_FOR_GENERATE_ACCOUNT)
