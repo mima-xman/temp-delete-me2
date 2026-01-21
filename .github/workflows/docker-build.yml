@@ -33,7 +33,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Test container starts
-        if: ${{ inputs.run_container == 'true' }}
+        if: ${{ github.event.inputs.run_container == 'true' }}
         run: |
           docker run --rm -d --name test-container github-generator:latest
           sleep 30
