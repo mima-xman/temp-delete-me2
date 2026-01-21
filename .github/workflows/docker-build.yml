@@ -1,12 +1,15 @@
 name: Docker Build Test
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       run_container:
         description: 'Run the container after build (test mode)'
         required: false
-        default: 'false'
+        default: 'true'
         type: boolean
 
 jobs:
