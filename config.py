@@ -114,7 +114,7 @@ ARGS: List[str] = [
     '--disable-setuid-sandbox',
     '--disable-infobars',
     '--ignore-certificate-errors',
-    f'--user-agent={USER_AGENT}'
+    # f'--user-agent={USER_AGENT}'
 ]
 
 # Browser executable paths

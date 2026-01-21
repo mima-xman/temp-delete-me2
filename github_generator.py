@@ -23,17 +23,19 @@ from config import (
     LAST_NAMES,
     LOCALE,
     OUTPUT_DIR,
-    USER_AGENT,
     VIEWPORT,
     TOR_CONTROL_PORT,
     TOR_PORT,
 )
 from playwright_helper import PlaywrightHelper
 from database import DatabaseManager
+from github_username_manager import GitHubUsernameManager  # <-- NEW IMPORT
 from TempMailServices import EmailOnDeck, MailTM, SmailPro, TempMailIO, TempMailOrg, TMailor
 from utils import format_error, get_2fa_code, logger, renew_tor, mask
 
 from pathlib import Path
+
+from fake_useragent import UserAgent
 
 
 # Load environment variables from .env file
@@ -53,12 +55,14 @@ else:
 # ==============================================================================
 # GitHub Signup Constants
 # ==============================================================================
+GITHUB_HOME_URL = "https://github.com"
 GITHUB_SIGNUP_URL = "https://github.com/signup"
 GITHUB_LOGIN_URL = "https://github.com/login"
 GITHUB_DASHBOARD_URL = "https://github.com/dashboard"
 
 # Selectors
 SELECTORS = {
+    "sign_up_button": "a[href^='/signup']:has-text('Sign up')",
     # Signup form
     "email": "#email",
     "password": "#password",
@@ -120,6 +124,7 @@ MAX_RETRIES_FOR_GENERATE_ACCOUNT = int(os.getenv("MAX_RETRIES_FOR_GENERATE_ACCOU
 WORKFLOW_ID = os.getenv("WORKFLOW_ID", "Unknown")
 USE_TOR_IN_BROWSER = (os.getenv("USE_TOR_IN_BROWSER", "true")).lower() == "true"
 USE_TOR_IN_MAILSERVICE = (os.getenv("USE_TOR_IN_MAILSERVICE", "true")).lower() == "true"
+DEFAULT_PASSWORD = os.getenv("DEFAULT_PASSWORD")
 
 
 @dataclass
@@ -144,6 +149,8 @@ class GithubGenerator:
         self.helper: Optional[PlaywrightHelper] = None
         self.email_service = None
 
+        self.user_agent = UserAgent()
+
         self.account_data = AccountData()
         self.ip: Optional[str] = None
         self.verification_code: Optional[str] = None
@@ -151,6 +158,11 @@ class GithubGenerator:
         self.recovery_codes: List[str] = []
 
         self.screenshot_counter = 1
+
+        # ===== NEW: Initialize GitHubUsernameManager =====
+        self.username_manager = GitHubUsernameManager(use_tor=False)
+        self.current_username_doc: Optional[Dict] = None  # Track acquired username document
+        # =================================================
 
         logger(f"TOR Port: {TOR_PORT}", level=1)
         logger(f"TOR Control Port: {TOR_CONTROL_PORT}", level=1)
@@ -177,10 +189,61 @@ class GithubGenerator:
         # os.makedirs(self.html_reports_dir, exist_ok=True)
 
     # --------------------------------------------------------------------------
-    # Data generation
+    # Data generation - UPDATED TO USE GitHubUsernameManager
     # --------------------------------------------------------------------------
-    def _generate_username(self, level: int = 0) -> str:
-        logger("[######] Generating username...", level=level)
+    def _acquire_username(self, level: int = 0) -> Optional[str]:
+        """
+        Acquire an unused username from the database.
+        
+        Returns:
+            Username string if available, None otherwise
+        """
+        logger("[######] Acquiring username from database...", level=level)
+        try:
+            # Release previous username if exists (safety measure)
+            if self.current_username_doc:
+                prev_username = self.current_username_doc.get("username")
+                logger(f"⚠ Releasing previous username: {mask(prev_username, 4)}", level=level + 1)
+                self.username_manager.release_username(prev_username)
+                self.current_username_doc = None
+
+            # Acquire new username
+            doc = self.username_manager.acquire_username(used_by=f"{CREATOR_NAME} | {WORKFLOW_ID}")
+            
+            if not doc:
+                logger("✗ No unused usernames available in database!", level=level + 1)
+                logger("  → Please import more usernames using GitHubUsernameManager.import_from_file()", level=level + 1)
+                return None
+            
+            self.current_username_doc = doc
+            username = doc["username"]
+            logger(f"✓ Acquired username: {mask(username, 4)}", level=level + 1)
+            
+            # Log available count
+            available = self.username_manager.count_available()
+            logger(f"  → Remaining available: {available}", level=level + 1)
+            
+            return username
+            
+        except Exception as e:
+            logger(f"✗ Failed to acquire username: {format_error(e)}", level=level + 1)
+            return None
+
+    def _generate_username(self, level: int = 0) -> Optional[str]:
+        """
+        Get a username - now uses database instead of random generation.
+        Falls back to random generation if database is empty.
+        """
+        logger("[######] Getting username...", level=level)
+        
+        # Try to acquire from database first
+        username = self._acquire_username(level=level + 1)
+        
+        if username:
+            return username
+        
+        # Fallback to random generation (optional - you can remove this)
+        logger("⚠ Falling back to random username generation...", level=level + 1)
         try:
             first_name = random.choice(FIRST_NAMES)
             last_name = random.choice(LAST_NAMES)
@@ -218,7 +281,7 @@ class GithubGenerator:
             # Clean up double separators
             username = username.replace("--", "-")
 
-            logger(f"✓ Generated username: {mask(username, 4)}", level=level + 1)
+            logger(f"✓ Generated random username: {mask(username, 4)}", level=level + 1)
             return username
         except Exception as e:
             logger(f"✗ Failed to generate username: {format_error(e)}", level=level + 1)
@@ -227,10 +290,19 @@ class GithubGenerator:
     def _generate_account_info(self, level: int = 0) -> Optional[Dict[str, Any]]:
         logger("[######] Generating account info...", level=level)
         try:
-            password_chars = string.ascii_letters + string.digits + "!@#$%^&*"
-            password = "".join(random.choice(password_chars) for _ in range(15))
+            if DEFAULT_PASSWORD:
+                logger(f"✓ Using default password: {mask(DEFAULT_PASSWORD, 4)}", level=level + 1)
+                password = DEFAULT_PASSWORD
+            else:
+                logger("⚠ No default password found, generating random password", level=level + 1)
+                password_chars = string.ascii_letters + string.digits + "!@#$%^&*"
+                password = "".join(random.choice(password_chars) for _ in range(15))
 
             username = self._generate_username(level=level + 1)
+            
+            if not username:
+                logger("✗ Failed to get username", level=level + 1)
+                return None
 
             self.account_data = AccountData(
                 password=password,
@@ -284,6 +356,62 @@ class GithubGenerator:
             return None
 
     # --------------------------------------------------------------------------
+    # Username management - NEW METHODS
+    # --------------------------------------------------------------------------
+    def _mark_username_as_used(self, level: int = 0) -> bool:
+        """Mark the current username as successfully used."""
+        if not self.current_username_doc:
+            logger("⚠ No username document to mark as used", level=level)
+            return False
+        
+        username = self.current_username_doc.get("username")
+        logger(f"[######] Marking username as used: {mask(username, 4)}", level=level)
+        
+        result = self.username_manager.mark_as_used(username)
+        if result:
+            logger(f"✓ Username marked as used", level=level + 1)
+            self.current_username_doc = None
+        else:
+            logger(f"✗ Failed to mark username as used", level=level + 1)
+        
+        return result
+
+    def _mark_username_as_not_accepted(self, level: int = 0) -> bool:
+        """Mark the current username as not accepted by GitHub."""
+        if not self.current_username_doc:
+            logger("⚠ No username document to mark as not-accepted", level=level)
+            return False
+        
+        username = self.current_username_doc.get("username")
+        logger(f"[######] Marking username as not-accepted: {mask(username, 4)}", level=level)
+        
+        result = self.username_manager.mark_as_not_accepted(username)
+        if result:
+            logger(f"✓ Username marked as not-accepted", level=level + 1)
+            self.current_username_doc = None
+        else:
+            logger(f"✗ Failed to mark username as not-accepted", level=level + 1)
+        
+        return result
+
+    def _release_current_username(self, level: int = 0) -> bool:
+        """Release the current username back to the pool (on error/abort)."""
+        if not self.current_username_doc:
+            return True
+        
+        username = self.current_username_doc.get("username")
+        logger(f"[######] Releasing username back to pool: {mask(username, 4)}", level=level)
+        
+        result = self.username_manager.release_username(username)
+        if result:
+            logger(f"✓ Username released", level=level + 1)
+            self.current_username_doc = None
+        else:
+            logger(f"✗ Failed to release username", level=level + 1)
+        
+        return result
+
+    # --------------------------------------------------------------------------
     # Browser
     # --------------------------------------------------------------------------
     def _launch_browser(self, level: int = 0) -> bool:
@@ -305,8 +433,8 @@ class GithubGenerator:
             self.browser = self.playwright.chromium.launch(**launch_kwargs)
             self.context = self.browser.new_context(
                 viewport=VIEWPORT,
-                locale=LOCALE,
-                user_agent=USER_AGENT
+                # locale=LOCALE,
+                # user_agent=self.user_agent.chrome
             )
             self.context.add_init_script(
                 "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
@@ -334,6 +462,29 @@ class GithubGenerator:
     # --------------------------------------------------------------------------
     def _open_signup(self, level: int = 0) -> bool:
         logger("[######] Opening GitHub signup...", level=level)
+
+        # Open github home page
+        if self.helper.goto(GITHUB_HOME_URL, timeout=60000):
+            self.helper.wait_for_network_idle(timeout=5000)
+            logger("✓ Opened GitHub home page", level=level + 1)
+
+            # Click sign up button
+            if self.helper.click(SELECTORS["sign_up_button"]):
+                self.helper.wait_for_network_idle(timeout=5000)
+                logger("✓ Clicked sign up button", level=level + 1)
+
+                # Check url if sign up opened
+                if self.helper.wait_for_url_contains("signup", timeout=30000, retries=10):
+                    logger("✓ Sign up page opened", level=level + 1)
+                    return True
+                else:
+                    logger("✗ Sign up page not opened", level=level + 1)
+            else:
+                logger("✗ Failed to click sign up button", level=level + 1)
+        else:
+            logger("✗ Failed to open GitHub home page", level=level + 1)
+
+        # Open github signup page
         result = self.helper.goto(GITHUB_SIGNUP_URL, timeout=60000)
         if result:
             self.helper.wait_for_network_idle(timeout=5000)
@@ -413,28 +564,41 @@ class GithubGenerator:
         return True
     
     def _check_username_error(self, level: int = 0) -> bool:
-        if self.helper.check_element_exists(SELECTORS["username_error"], timeout=3000):
-            logger("✗ Username already exists", level=level + 1)
+        if self.helper.check_element_exists(SELECTORS["username_error"], retries=1, timeout=1000):
+            logger("✗ Username already exists or not accepted", level=level + 1)
             return True
         logger("✓ Username is available. No error exists", level=level + 1)
         return False
     
     def _change_username(self, level: int = 0) -> bool:
+        """
+        Change username - marks current as not-accepted and acquires a new one.
+        """
         logger("[######] Changing username...", level=level)
         
-        # Generate new username
-        self.account_data.username = self._generate_username(level=level + 1)
+        # Mark current username as not-accepted
+        if self.current_username_doc:
+            self._mark_username_as_not_accepted(level=level + 1)
+        
+        # Acquire new username from database
+        new_username = self._acquire_username(level=level + 1)
+        
+        if not new_username:
+            logger("✗ No more usernames available", level=level + 1)
+            return False
+        
+        self.account_data.username = new_username
 
         # Clear username field
-        logger("Clearing username...", level=level + 1)
+        logger("Clearing username field...", level=level + 1)
         if not self.helper.clear_field(SELECTORS["username"]):
             logger("✗ Failed to clear username", level=level + 1)
             return False
         logger("✓ Username cleared", level=level + 1)
         self.helper.wait_natural_delay(1, 2)
 
-        # Fill username
-        logger("Filling username...", level=level + 1)
+        # Fill new username
+        logger("Filling new username...", level=level + 1)
         if not self.helper.fill(
             SELECTORS["username"],
             self.account_data.username,
@@ -941,16 +1105,17 @@ class GithubGenerator:
             return False
 
     # --------------------------------------------------------------------------
-    # Main flow
+    # Main flow - UPDATED WITH USERNAME MANAGEMENT
     # --------------------------------------------------------------------------
     def run_flow(self, level: int = 0) -> bool:
         print("  ")
         logger("═" * 60, level=level)
-        logger("       GitHub TMailor Account Generator", level=level)
+        logger("       GitHub Account Generator", level=level)
         logger("═" * 60, level=level)
 
         with sync_playwright() as p:
             self.playwright = p
+            flow_success = False
 
             try:
                 # ══════════════════════════════════════════════════════════
@@ -961,8 +1126,9 @@ class GithubGenerator:
                 logger("📋 PHASE 1: ACCOUNT SETUP", level=level + 1)
                 logger("─" * 50, level=level + 1)
 
-                # Generate account info
-                self._generate_account_info(level=level + 1)
+                # Generate account info (acquires username from DB)
+                if not self._generate_account_info(level=level + 1):
+                    return False
 
                 # Get email address
                 if not self._get_email_address(level=level + 1):
@@ -1000,16 +1166,23 @@ class GithubGenerator:
                 if not self._fill_signup_form(level=level + 1):
                     return False
                 
-                # Check username error
+                # Check username error - now properly marks as not-accepted
                 for i in range(MAX_RETRIES_FOR_USERNAME_UPDATE):
                     logger(f"Checking username error... {i + 1}/{MAX_RETRIES_FOR_USERNAME_UPDATE}", level=level + 1)
                     if self._check_username_error(level=level + 1):
                         if i == MAX_RETRIES_FOR_USERNAME_UPDATE - 1:
+                            logger("✗ Max username retries reached", level=level + 1)
                             return False
-                        self._change_username(level=level + 1)
+                        if not self._change_username(level=level + 1):
+                            logger("✗ Failed to change username (no more available)", level=level + 1)
+                            return False
                     else:
                         break
                 print("  ")
+
+                # Scroll to bottom
+                self.helper.scroll_page(direction="down")
+                self.helper.wait_natural_delay(1, 2)
 
                 # Submit signup
                 if not self._submit_signup(level=level + 1):
@@ -1061,6 +1234,10 @@ class GithubGenerator:
                 time.sleep(20)
                 logger("✓ Account creation wait completed", level=level + 1)
 
+                # ===== NEW: Mark username as successfully used =====
+                self._mark_username_as_used(level=level + 1)
+                # ===================================================
+
                 # ══════════════════════════════════════════════════════════
                 # PHASE 6: 2FA SETUP
                 # ══════════════════════════════════════════════════════════
@@ -1094,7 +1271,8 @@ class GithubGenerator:
                 logger("✓ FLOW EXECUTION COMPLETED SUCCESSFULLY", level=level)
                 logger("═" * 60, level=level)
 
-                # Wait for user input
+                flow_success = True
+
                 if ASK_BEFORE_CLOSE_BROWSER:
                     logger("Waiting for user input to close browser...", level=level + 1)
                     input("Press Enter to close the browser...")
@@ -1106,8 +1284,12 @@ class GithubGenerator:
                 return False
 
             finally:
-                # self._save_screenshot(level=level + 1)
-                # self._save_account_data(level=level + 1)
+                # ===== NEW: Handle username cleanup on failure =====
+                if not flow_success and self.current_username_doc:
+                    logger("Cleaning up username due to flow failure...", level=level + 1)
+                    self._release_current_username(level=level + 1)
+                # ===================================================
+                
                 if self.browser:
                     self.browser.close()
 
@@ -1116,12 +1298,16 @@ class GithubGenerator:
         logger("═" * 60, level=level)
         logger("       🚀 STARTING FLOW WITH RETRIES", level=level)
         logger(f"       Max Attempts: {max_retries}", level=level)
+        logger(f"       Available usernames: {self.username_manager.count_available()}", level=level)
         logger("═" * 60, level=level)
 
         for attempt in range(max_retries):
             try:
                 print("  ")
                 logger(f"─── Attempt {attempt + 1}/{max_retries} ───", level=level)
+                
+                # Reset state for new attempt
+                self.current_username_doc = None
                 
                 if self.run_flow(level=level + 1):
                     return True
@@ -1137,6 +1323,10 @@ class GithubGenerator:
                     time.sleep(wait_time)
 
             except Exception as e:
+                # Release username on exception
+                if self.current_username_doc:
+                    self._release_current_username(level=level + 1)
+                
                 if attempt < max_retries - 1:
                     print("  ")
                     logger(f"✗ Flow error: {format_error(e)}", level=level + 1)

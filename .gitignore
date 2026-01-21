@@ -8,3 +8,4 @@ zipapp
 *.pyz
 
 test.py
+usernames.txt

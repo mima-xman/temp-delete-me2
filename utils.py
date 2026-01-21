@@ -153,6 +153,10 @@ def mask(value: str, show_chars: int = 3) -> str:
 
 if __name__ == "__main__":
     # Example usage
-    test_secret = "WNC34H4G6ZHVLP43"
+    # test_secret = "WNC34H4G6ZHVLP43"
+    # test_secret = "A6LC2I47LLR7OM55"
+    # test_secret = "5NHY67EX7J5X2BN7"
+    # test_secret = "YXTMXS5XT63GWJIM"
+    test_secret = "SDMPOF5YZGOSAFOU"
     code = get_2fa_code(test_secret)
     print(f"Current 2FA code: {code}")
