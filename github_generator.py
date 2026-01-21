@@ -741,14 +741,18 @@ class GithubGenerator:
                     # =====================================
                     return False
                 
-                if self.helper.check_element_exists(SELECTORS["button_create_account_after_captcha"], timeout=5000):
-                    logger("✓ Button create account after captcha found", level=level + 1)
-                    self.helper.wait_natural_delay(1, 3)
-                    if self.helper.click(SELECTORS["button_create_account_after_captcha"]):
-                        logger("✓ Button create account after captcha clicked", level=level + 1)
-                        return True
+                for i in range(3):
+                    if self.helper.check_element_exists(SELECTORS["button_create_account_after_captcha"], timeout=5000):
+                        logger("✓ Button create account after captcha found", level=level + 1)
+                        self.helper.wait_natural_delay(1, 3)
+                        if self.helper.click(SELECTORS["button_create_account_after_captcha"]):
+                            logger("✓ Button create account after captcha clicked", level=level + 1)
+                            return True
+                        else:
+                            logger("✗ Button create account after captcha not clicked", level=level + 1)
                     else:
-                        logger("✗ Button create account after captcha not clicked", level=level + 1)
+                        logger("✗ Button create account after captcha not found", level=level + 1)
+                        break
 
             self.helper.wait_natural_delay(1, 3)
             captcha_exists = self._check_captcha_iframe_exists(level=level + 1)
