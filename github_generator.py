@@ -339,7 +339,7 @@ class GithubGenerator:
                 self.email_service = EmailOnDeck(use_tor=self.use_tor_in_mailservice)
 
             result = self.email_service.generate_email(
-                username=self.account_data.username,
+                # username=self.account_data.username,
                 level=level + 1
             )
 
