@@ -1,0 +1,41 @@
+name: Docker Build Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_container:
+        description: 'Run the container after build (test mode)'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: false
+          tags: github-generator:latest
+          load: true
+          build-args: |
+            GITHUB_TOKEN=${{ secrets.PLAYWRIGHT_HELPER_GITHUB_TOKEN }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Test container starts
+        if: ${{ inputs.run_container == 'true' }}
+        run: |
+          docker run --rm -d --name test-container github-generator:latest
+          sleep 30
+          docker logs test-container
+          docker stop test-container || true

@@ -1,0 +1,6 @@
+User debian-tor
+SocksPort 9150
+ControlPort 9151
+DataDirectory /var/lib/tor
+CookieAuthentication 0
+Log notice stdout

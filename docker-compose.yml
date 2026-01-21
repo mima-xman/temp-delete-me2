@@ -1,0 +1,23 @@
+services:
+  github-generator:
+    build: .
+    container_name: github-generator
+    restart: "no"
+    tty: true
+    stdin_open: true
+    environment:
+      - TOR_PORT=9150
+      - TOR_CONTROL_PORT=9151
+      - HEADLESS=true
+      - USE_TOR_IN_BROWSER=true
+      - USE_TOR_IN_MAILSERVICE=true
+      # Override these with .env file or command line
+      - DEFAULT_PASSWORD=${DEFAULT_PASSWORD:-}
+      - EMAIL_SERVICE_NAME=${EMAIL_SERVICE_NAME:-EmailOnDeck}
+      - CREATOR_NAME=${CREATOR_NAME:-Docker}
+      - MONGODB_URI=${MONGODB_URI:-}
+    volumes:
+      # Mount output directory for screenshots and results
+      - ./output:/app/output
+      # Mount .env file if exists
+      - ./.env:/app/.env:ro
