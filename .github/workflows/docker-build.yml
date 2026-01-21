@@ -36,6 +36,6 @@ jobs:
         if: ${{ github.event.inputs.run_container == 'true' }}
         run: |
           docker run --rm -d --name test-container github-generator:latest
-          sleep 30
+          sleep 300
           docker logs test-container
           docker stop test-container || true
