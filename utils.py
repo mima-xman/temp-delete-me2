@@ -201,10 +201,11 @@ def get_exit_fingerprints_by_ip(target_ips: List[str], level: int = 0) -> Dict[s
         for desc in stem.descriptor.remote.get_consensus():
             if desc.address in target_ips and 'Exit' in desc.flags:
                 fingerprints[desc.address] = desc.fingerprint
-                logger(f"Found: {desc.address} -> {desc.fingerprint}", level=level)
+                # logger(f"Found: {desc.address} -> {desc.fingerprint}", level=level)
     except Exception as e:
         logger(f"Error fetching descriptors: {e}", level=level)
     
+    logger(f"Found {len(fingerprints)} exit nodes", level=level)
     return fingerprints
 
 

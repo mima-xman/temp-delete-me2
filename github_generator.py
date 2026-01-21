@@ -89,7 +89,7 @@ SELECTORS = {
     "captcha_iframe_2": "#funcaptcha > div > iframe",
     "captcha_iframe_3": "#game-core-frame",
     "puzzle_button": "#root > div > div > button[aria-label='Visual puzzle']",
-    "button_create_account_after_captcha": "button[type='submit']:has-text('Create account')",
+    "button_create_account_after_captcha": "button[type='submit']:has-text('Create account'):not([hidden='hidden']):not([hidden='true'])",
     
     # Login
     "login_field": "input#login_field",
