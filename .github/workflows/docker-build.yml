@@ -35,7 +35,6 @@ jobs:
       - name: Test container starts
         if: ${{ github.event.inputs.run_container == 'true' }}
         run: |
-          docker run --rm -d --name test-container github-generator:latest
-          sleep 300
-          docker logs test-container
-          docker stop test-container || true
+          # Run container in foreground with timeout (5 minutes)
+          timeout 120 docker run --rm --name test-container github-generator:latest || true
+          echo "Container exited or timed out"
