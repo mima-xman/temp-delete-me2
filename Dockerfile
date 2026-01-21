@@ -3,13 +3,14 @@
 
 FROM python:3.11-slim
 
-# Install system dependencies: Tor, netcat, and Playwright browser dependencies
+# Install system dependencies: Tor, netcat, git, and Playwright browser dependencies
 RUN apt-get update && \
     apt-get install -y \
     tor \
     netcat-openbsd \
     wget \
     gnupg \
+    git \
     # Playwright browser dependencies
     libnss3 \
     libnspr4 \
