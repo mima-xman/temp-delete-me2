@@ -2,8 +2,9 @@
 
 import os
 from pymongo import MongoClient
-from pathlib import Path
+
 from dotenv import load_dotenv
+from pathlib import Path
 
 
 # Load environment variables from .env file

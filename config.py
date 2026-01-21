@@ -8,6 +8,23 @@ browser settings, and output paths.
 import os
 from typing import Dict, List
 
+from dotenv import load_dotenv
+from pathlib import Path
+
+
+# Load environment variables from .env file
+# Check for .env in current directory first (for zipapp support)
+env_path = Path.cwd() / ".env"
+if env_path.exists():
+    load_dotenv(dotenv_path=env_path)
+else:
+    # Fallback to default discovery (for development)
+    try:
+        load_dotenv()
+    except AssertionError:
+        # Can happen in zipapp if .env is missing and finding logic fails
+        pass
+
 # ==============================================================================
 # Tor Network Settings
 # ==============================================================================

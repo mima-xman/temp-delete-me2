@@ -12,7 +12,6 @@ from dataclasses import dataclass, asdict
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright
 
 from config import (
@@ -33,9 +32,10 @@ from github_username_manager import GitHubUsernameManager  # <-- NEW IMPORT
 from TempMailServices import EmailOnDeck, MailTM, SmailPro, TempMailIO, TempMailOrg, TMailor
 from utils import format_error, get_2fa_code, logger, renew_tor, mask
 
-from pathlib import Path
-
 from fake_useragent import UserAgent
+
+from dotenv import load_dotenv
+from pathlib import Path
 
 
 # Load environment variables from .env file
