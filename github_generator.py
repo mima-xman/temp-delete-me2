@@ -747,6 +747,8 @@ class GithubGenerator:
                     if self.helper.click(SELECTORS["button_create_account_after_captcha"]):
                         logger("✓ Button create account after captcha clicked", level=level + 1)
                         return True
+                    else:
+                        logger("✗ Button create account after captcha not clicked", level=level + 1)
 
             self.helper.wait_natural_delay(1, 3)
             captcha_exists = self._check_captcha_iframe_exists(level=level + 1)
