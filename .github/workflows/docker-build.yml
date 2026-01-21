@@ -29,13 +29,15 @@ jobs:
           load: true
           build-args: |
             GITHUB_TOKEN=${{ secrets.PLAYWRIGHT_HELPER_GITHUB_TOKEN }}
-            MONGODB_URI=${{ secrets.MONGODB_URI }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Test container starts
         if: ${{ github.event.inputs.run_container == 'true' }}
         run: |
-          # Run container in foreground with timeout (5 minutes)
-          timeout 120 docker run --rm --name test-container github-generator:latest || true
+          # Run container in foreground with timeout (2 minutes)
+          timeout 120 docker run --rm --name test-container \
+            -e MONGODB_URI="${{ secrets.MONGODB_URI }}" \
+            -e CREATOR_NAME="Docker-Test" \
+            github-generator:latest || true
           echo "Container exited or timed out"
