@@ -29,6 +29,7 @@ jobs:
           load: true
           build-args: |
             GITHUB_TOKEN=${{ secrets.PLAYWRIGHT_HELPER_GITHUB_TOKEN }}
+            MONGODB_URI=${{ secrets.MONGODB_URI }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
