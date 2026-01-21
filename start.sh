@@ -7,9 +7,9 @@ echo "GitHub Account Generator - Docker Startup"
 echo "=========================================="
 echo ""
 
-# Start Tor in background
+# Start Tor in background with logs redirected to file
 echo "Starting Tor..."
-tor &
+tor > /tmp/tor.log 2>&1 &
 
 # Wait for Tor ports to open
 echo "Waiting for Tor ports to open..."
