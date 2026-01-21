@@ -701,7 +701,8 @@ class GithubGenerator:
 
             if captcha_check_count > MAX_CAPTCHA_WAIT_ITERATIONS:
                 logger("⚠ Max captcha wait iterations reached", level=level + 1)
-                break
+                self._save_screenshot(level=level + 1)
+                return False
 
             logger("Captcha iframe still present, waiting...", level=level + 1)
 
