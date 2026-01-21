@@ -16,6 +16,7 @@ services:
       - EMAIL_SERVICE_NAME=${EMAIL_SERVICE_NAME:-EmailOnDeck}
       - CREATOR_NAME=${CREATOR_NAME:-Docker}
       - MONGODB_URI=${MONGODB_URI:-}
+      - CHROME_PATH=${CHROME_PATH:-}
     volumes:
       # Mount output directory for screenshots and results
       - ./output:/app/output
