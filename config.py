@@ -35,6 +35,9 @@ TOR_PORT: int = int(os.getenv("TOR_PORT", 9150))
 # Tor control port for circuit renewal (9151 for Tor Browser, 9051 for system Tor)
 TOR_CONTROL_PORT: int = int(os.getenv("TOR_CONTROL_PORT", 9151))
 
+# your password
+TOR_CONTROL_PASSWORD = None
+
 # ==============================================================================
 # Account Generation Settings
 # ==============================================================================

@@ -29,8 +29,9 @@ from config import (
 from playwright_helper import PlaywrightHelper
 from database import DatabaseManager
 from github_username_manager import GitHubUsernameManager  # <-- NEW IMPORT
+from ip_manager import IPManager
 from TempMailServices import EmailOnDeck, MailTM, SmailPro, TempMailIO, TempMailOrg, TMailor
-from utils import format_error, get_2fa_code, logger, renew_tor, mask
+from utils import format_error, get_2fa_code, logger, renew_tor, mask, renew_tor_ip_with_preferred_exit, get_current_ip
 
 from fake_useragent import UserAgent
 
@@ -59,6 +60,7 @@ GITHUB_HOME_URL = "https://github.com"
 GITHUB_SIGNUP_URL = "https://github.com/signup"
 GITHUB_LOGIN_URL = "https://github.com/login"
 GITHUB_DASHBOARD_URL = "https://github.com/dashboard"
+GITHUB_NEW_REPO_URL = "https://github.com/new"
 
 # Selectors
 SELECTORS = {
@@ -87,6 +89,7 @@ SELECTORS = {
     "captcha_iframe_2": "#funcaptcha > div > iframe",
     "captcha_iframe_3": "#game-core-frame",
     "puzzle_button": "#root > div > div > button[aria-label='Visual puzzle']",
+    "button_create_account_after_captcha": "button[type='submit']:has-text('Create account')",
     
     # Login
     "login_field": "input#login_field",
@@ -112,6 +115,14 @@ SELECTORS = {
     "download_codes_button": "button[data-action='click:two-factor-setup-recovery-codes#onDownloadClick']",
     "saved_codes_button": "button[data-target='single-page-wizard-step.nextButton']:has-text('I have saved my recovery codes')",
     "done_button": "button[data-target='single-page-wizard-step.nextButton']:has-text('Done')",
+
+    # Create repository
+    "button_plus": "button:has(.octicon-plus)",
+    "new_repository_option": "a[href='/new']",
+    "repository_name_input": "input#repository-name-input",
+    "repository_name_error": "span#RepoNameInput-message",
+    "repository_add_readme_button": "button[aria-labelledby='add-readme']",
+    "repository_create_button": "button[type='submit']:has-text('Create repository')",
 }
 
 USERNAME_PREFIXES = ["developer", "coder", "hacker", "builder"]
@@ -125,6 +136,8 @@ WORKFLOW_ID = os.getenv("WORKFLOW_ID", "Unknown")
 USE_TOR_IN_BROWSER = (os.getenv("USE_TOR_IN_BROWSER", "true")).lower() == "true"
 USE_TOR_IN_MAILSERVICE = (os.getenv("USE_TOR_IN_MAILSERVICE", "true")).lower() == "true"
 DEFAULT_PASSWORD = os.getenv("DEFAULT_PASSWORD")
+FIRST_REPO_NAME = os.getenv("FIRST_REPO_NAME", "me")
+MAX_RETRY_FOR_CHECK_REPO_CREATION = 5
 
 
 @dataclass
@@ -148,6 +161,7 @@ class GithubGenerator:
         self.page = None
         self.helper: Optional[PlaywrightHelper] = None
         self.email_service = None
+        self.proxies: Optional[Dict] = {}
 
         self.user_agent = UserAgent()
 
@@ -164,6 +178,10 @@ class GithubGenerator:
         self.current_username_doc: Optional[Dict] = None  # Track acquired username document
         # =================================================
 
+        # ===== NEW: Initialize IPManager =====
+        self.ip_manager = IPManager()
+        # =====================================
+
         logger(f"TOR Port: {TOR_PORT}", level=1)
         logger(f"TOR Control Port: {TOR_CONTROL_PORT}", level=1)
 
@@ -171,6 +189,10 @@ class GithubGenerator:
         
         if self.use_tor_in_browser:
             logger("Using TOR network for browser", level=1)
+            self.proxies = {
+                "http": f"socks5://127.0.0.1:{TOR_PORT}",
+                "https": f"socks5://127.0.0.1:{TOR_PORT}",
+            }
 
         if self.use_tor_in_mailservice:
             logger("Using TOR network for emails...", level=1)
@@ -710,7 +732,21 @@ class GithubGenerator:
                 self.helper.wait_natural_delay(1, 3)
                 if self._check_puzzle_displayed(level=level + 1):
                     logger("✗ Visual puzzle captcha detected - cannot proceed", level=level + 1)
+                    # ===== NEW: Update IP usage stats =====
+                    self.ip = get_current_ip(proxies=self.proxies, level=level + 1)
+                    logger(f"Current IP to save in DB: {self.ip}", level=level + 1)
+                    if self.ip:
+                        result = self.ip_manager.add_ip_usage(self.ip, success=False, level=level + 1)
+                        logger(f"Add IP usage result: {result}", level=level + 1)
+                    # =====================================
                     return False
+                
+                if self.helper.check_element_exists(SELECTORS["button_create_account_after_captcha"], timeout=5000):
+                    logger("✓ Button create account after captcha found", level=level + 1)
+                    self.helper.wait_natural_delay(1, 3)
+                    if self.helper.click_element(SELECTORS["button_create_account_after_captcha"], level=level + 1):
+                        logger("✓ Button create account after captcha clicked", level=level + 1)
+                        return True
 
             self.helper.wait_natural_delay(1, 3)
             captcha_exists = self._check_captcha_iframe_exists(level=level + 1)
@@ -778,6 +814,8 @@ class GithubGenerator:
         for i in range(5):
             # Check if the submit button is visible
             if self.helper.check_element_visible(SELECTORS["verification_submit"], timeout=5000):
+                logger("✓ Verification submit button found", level=level + 1)
+                
                 # Click the submit button
                 if self.helper.click(SELECTORS["verification_submit"], retries=1, timeout=5000):
                     logger("✓ Verification submitted", level=level + 1)
@@ -1029,6 +1067,102 @@ class GithubGenerator:
             return False
 
     # --------------------------------------------------------------------------
+    # Create repository
+    # --------------------------------------------------------------------------
+    def _create_repository(self, level: int = 0):
+        logger("[######] Creating repository...", level=level)
+        try:
+            new_repo_page_opened = False
+
+            # Click button plus
+            logger("Open repository page humanly", level=level + 1)
+            if self.helper.click(SELECTORS["button_plus"]):
+                logger("✓ Button plus clicked", level=level + 2)
+                self.helper.wait_natural_delay(2, 4)
+
+                # Click new repository
+                if self.helper.click(SELECTORS["new_repository_option"]):
+                    logger("✓ New repository option clicked", level=level + 2)
+                    self.helper.wait_natural_delay(2, 4)
+
+                    # Check current url is /new
+                    if self.helper.wait_for_url_contains("new"):
+                        logger("✓ New repository page opened", level=level + 2)
+                        new_repo_page_opened = True
+                    else:
+                        logger("✗ New repository page not opened", level=level + 2)
+                else:
+                    logger("✗ Failed to click new repository option", level=level + 2)
+            else:
+                logger("✗ Failed to click button plus", level=level + 2)
+
+            if not new_repo_page_opened:
+                # Navigate to new repository page
+                logger("Navigate to new repository page", level=level + 1)
+                if not self.page.goto(GITHUB_NEW_REPO_URL):
+                    logger("✗ Failed to navigate to new repository page", level=level + 2)
+                    return False
+            
+            self.helper.wait_natural_delay(2, 4)
+
+            # Check if already on new repository page
+            if not self.helper.check_element_visible(SELECTORS["repository_name_input"]):
+                logger("✗ Repository name input not exists", level=level + 1)
+                return False
+
+            # Prepare repository name
+            repo_name = FIRST_REPO_NAME or "me"
+            logger(f"✓ Repository name: {repo_name}", level=level + 1)
+
+            # Enter repository name
+            if not self.helper.type_text(SELECTORS["repository_name_input"], repo_name):
+                logger("✗ Failed to enter repository name", level=level + 1)
+                return False
+
+            self.helper.wait_natural_delay(2, 4)
+
+            # Check if repository name is valid
+            if self.helper.check_element_visible(SELECTORS["repository_name_error"]):
+                error_message = self.helper.get_element_content(SELECTORS["repository_name_error"])
+                logger(f"✗ Repository name is not valid: {error_message}", level=level + 1)
+                return False
+
+            self.helper.wait_natural_delay(2, 4)
+
+            # Click add readme button
+            if not self.helper.click(SELECTORS["repository_add_readme_button"]):
+                logger("✗ Failed to click add readme button", level=level + 1)
+
+            self.helper.wait_natural_delay(2, 4)
+
+            # Click create repository button
+            if not self.helper.click(SELECTORS["repository_create_button"]):
+                logger("✗ Failed to click create repository button", level=level + 1)
+                return False
+
+            self.helper.wait_natural_delay(2, 4)
+
+            # Check if repository is created
+            for i in range(MAX_RETRY_FOR_CHECK_REPO_CREATION):
+                logger(f"Checking if repository is created ({i + 1}/{MAX_RETRY_FOR_CHECK_REPO_CREATION})", level=level + 1)
+                current_url = self.page.evaluate("window.location.href")
+                logger(f"Current URL: {current_url}", level=level + 1)
+                if current_url and current_url != GITHUB_NEW_REPO_URL:
+                    logger("✓ Repository created successfully", level=level + 1)
+                    return True
+                else:
+                    logger(f"✗ Repository page not changed", level=level + 1)
+                self.helper.wait_natural_delay(2, 4)
+
+            logger("✗ Repository not created", level=level + 1)
+            return False
+
+        except Exception as e:
+            logger(f"✗ Repository creation error: {format_error(e)}", level=level + 1)
+            # self._save_screenshot(level=level + 1)
+            return False
+
+    # --------------------------------------------------------------------------
     # Debug / persistence
     # --------------------------------------------------------------------------
     def _save_screenshot(self, level: int = 0) -> None:
@@ -1239,6 +1373,14 @@ class GithubGenerator:
                 self._mark_username_as_used(level=level + 1)
                 # ===================================================
 
+                # ===== NEW: Update IP usage stats =====
+                self.ip = get_current_ip(proxies=self.proxies, level=level + 1)
+                logger(f"Current IP to save in DB: {self.ip}", level=level + 1)
+                if self.ip:
+                    result = self.ip_manager.add_ip_usage(self.ip, success=True, level=level + 1)
+                    logger(f"Add IP usage result: {result}", level=level + 1)
+                # =====================================
+
                 # ══════════════════════════════════════════════════════════
                 # PHASE 6: 2FA SETUP
                 # ══════════════════════════════════════════════════════════
@@ -1266,6 +1408,21 @@ class GithubGenerator:
                 # Update status and save to database
                 self.account_data.status = "active"
                 self._save_account_to_db(level=level + 1)
+
+                # ══════════════════════════════════════════════════════════
+                # PHASE 8: CREATE REPOSITORY
+                # ══════════════════════════════════════════════════════════
+                print("  ")
+                logger("─" * 50, level=level + 1)
+                logger("💾 PHASE 8: CREATE REPOSITORY", level=level + 1)
+                logger("─" * 50, level=level + 1)
+
+                # Create repository
+                if not self._create_repository(level=level + 1):
+                    logger("✗ Repository creation failed", level=level + 1)
+                    self._save_screenshot(level=level + 1)
+                else:
+                    logger("✓ Repository creation completed successfully", level=level + 1)
 
                 print("  ")
                 logger("═" * 60, level=level)
@@ -1318,7 +1475,8 @@ class GithubGenerator:
                     logger(f"✗ Flow failed, preparing retry ({attempt + 1}/{max_retries})...", level=level + 1)
                     if self.use_tor_in_browser:
                         logger("🔄 Renewing Tor connection...", level=level + 1)
-                        _, self.ip = renew_tor(level=level + 1)
+                        all_ips = self.ip_manager.get_ips_list(level=level + 1)
+                        _, self.ip = renew_tor_ip_with_preferred_exit(preferred_ips=all_ips, level=level + 1)
                     wait_time = random.uniform(5, 10)
                     logger(f"⏳ Waiting {wait_time:.1f}s before next attempt...", level=level + 1)
                     time.sleep(wait_time)
@@ -1334,7 +1492,8 @@ class GithubGenerator:
                     logger(f"   Preparing retry ({attempt + 1}/{max_retries})...", level=level + 1)
                     if self.use_tor_in_browser:
                         logger("🔄 Renewing Tor connection...", level=level + 1)
-                        _, self.ip = renew_tor(level=level + 1)
+                        all_ips = self.ip_manager.get_ips_list(level=level + 1)
+                        _, self.ip = renew_tor_ip_with_preferred_exit(preferred_ips=all_ips, level=level + 1)
                     wait_time = random.uniform(5, 10)
                     logger(f"⏳ Waiting {wait_time:.1f}s before next attempt...", level=level + 1)
                     time.sleep(wait_time)
