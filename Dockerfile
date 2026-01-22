@@ -76,7 +76,7 @@ ENV TOR_CONTROL_PORT=9151
 ENV HEADLESS=true
 ENV USE_TOR_IN_BROWSER=true
 ENV USE_TOR_IN_MAILSERVICE=true
-ENV CHROME_PATH="/usr/bin/google-chrome"
+ENV BROWSER_PATH="/usr/bin/google-chrome"
 
 # Use start.sh as the entry point
 CMD ["./start.sh"]

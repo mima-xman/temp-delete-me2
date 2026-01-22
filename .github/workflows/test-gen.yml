@@ -105,7 +105,7 @@ jobs:
           EMAIL_SERVICE_NAME: ${{ github.event.inputs.email_service_name || 'EmailOnDeck' }}
           USE_TOR_IN_BROWSER: ${{ github.event.inputs.use_tor_in_browser }}
           USE_TOR_IN_MAILSERVICE: ${{ github.event.inputs.use_tor_in_mailservice }}
-          CHROME_PATH: "/usr/bin/google-chrome"
+          BROWSER_PATH: "/usr/bin/google-chrome"
           PYTHONUNBUFFERED: "1"
         run: |
           xvfb-run --auto-servernum --server-args="-screen 0 1280x960x24" python github_generator.py

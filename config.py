@@ -112,7 +112,7 @@ MAX_RETRIES_FOR_ACCOUNT_CREATION: int = 3
 # ==============================================================================
 
 # Browser viewport dimensions
-VIEWPORT: Dict[str, int] = {'width': 1024, 'height': 768}
+VIEWPORT: Dict[str, int] = {'width': 1024, 'height': 700}
 
 # Browser locale for internationalization
 LOCALE: str = 'fr-FR'
@@ -139,7 +139,9 @@ ARGS: List[str] = [
 
 # Browser executable paths
 BRAVE_PATH: str = r"C:\Program Files\BraveSoftware\Brave-Browser\Application\brave.exe"
-CHROME_PATH: str = os.getenv("CHROME_PATH", r"C:\Program Files\Google\Chrome\Application\chrome.exe")
+GOOGLE_CHROME_PATH: str = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
+CHROMIUM_PATH: str = r"C:\Program Files\Chromium\Application\chrome.exe"
+BROWSER_PATH: str = os.getenv("BROWSER_PATH", GOOGLE_CHROME_PATH)
 
 # ==============================================================================
 # Output Settings

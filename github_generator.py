@@ -16,7 +16,7 @@ from playwright.sync_api import sync_playwright
 
 from config import (
     ARGS,
-    CHROME_PATH,
+    BROWSER_PATH,
     FIRST_NAMES,
     HEADLESS,
     LAST_NAMES,
@@ -446,11 +446,11 @@ class GithubGenerator:
                 launch_kwargs["proxy"] = {"server": tor_proxy}
                 logger(f"Using Tor proxy: {tor_proxy}", level=level + 1)
 
-            if os.path.exists(CHROME_PATH):
-                launch_kwargs["executable_path"] = CHROME_PATH
-                logger(f"Using Browser: {CHROME_PATH}", level=level + 1)
+            if BROWSER_PATH and os.path.exists(BROWSER_PATH):
+                launch_kwargs["executable_path"] = BROWSER_PATH
+                logger(f"Using browser at: {BROWSER_PATH}", level=level + 1)
             else:
-                logger(f"⚠ Browser not found at {CHROME_PATH}, using default Chromium", level=level + 1)
+                logger("Using default Chromium browser", level=level + 1)
 
             self.browser = self.playwright.chromium.launch(**launch_kwargs)
             self.context = self.browser.new_context(
@@ -730,32 +730,16 @@ class GithubGenerator:
 
             if captcha_check_count > 5:
                 self.helper.wait_natural_delay(1, 3)
+
+                # Check if puzzle captcha is displayed
                 if self._check_puzzle_displayed(level=level + 1):
                     logger("✗ Visual puzzle captcha detected - cannot proceed", level=level + 1)
-                    # ===== NEW: Update IP usage stats =====
-                    self.ip = get_current_ip(proxies=self.proxies, level=level + 1)
-                    logger(f"Current IP to save in DB: {self.ip}", level=level + 1)
-                    if self.ip:
-                        result = self.ip_manager.add_ip_usage(self.ip, success=False, level=level + 1)
-                        logger(f"Add IP usage result: {result}", level=level + 1)
-                    # =====================================
                     return False
                 
-                for i in range(3):
-                    logger(f"Checking for button create account after captcha ({i + 1}/3)...", level=level + 1)
-                    if self.helper.check_element_exists(SELECTORS["button_create_account_after_captcha"], retries=1, timeout=5000):
-                        logger("✓ Button create account after captcha found", level=level + 2)
-                        self.helper.wait_natural_delay(1, 3)
-                        try:
-                            self.page.click(SELECTORS["button_create_account_after_captcha"], timeout=5000)
-                            logger("✓ Button create account after captcha clicked", level=level + 2)
-                            return True
-                        except Exception as e:
-                            logger(f"✗ Failed to click button: {format_error(e)}", level=level + 2)
-                            logger("✗ Button create account after captcha not clicked", level=level + 2)
-                    else:
-                        logger("✗ Button create account after captcha not found", level=level + 2)
-                        break
+                # Check if button create account after captcha is displayed
+                if self.helper.check_element_exists(SELECTORS["button_create_account_after_captcha"], retries=1, timeout=5000):
+                    logger("✗ Button create account after captcha found - cannot proceed", level=level + 1)
+                    return False
 
             self.helper.wait_natural_delay(1, 3)
             captcha_exists = self._check_captcha_iframe_exists(level=level + 1)
@@ -1342,6 +1326,13 @@ class GithubGenerator:
 
                 # Wait for captcha to clear
                 if not self._wait_for_captcha_to_clear(level=level + 1):
+                    # ===== NEW: Update IP usage stats =====
+                    self.ip = get_current_ip(proxies=self.proxies, level=level + 1)
+                    logger(f"Current IP to save in DB: {self.ip}", level=level + 1)
+                    if self.ip:
+                        result = self.ip_manager.add_ip_usage(self.ip, success=False, level=level + 1)
+                        logger(f"Add IP usage result: {result}", level=level + 1)
+                    # =====================================
                     return False
 
                 # ══════════════════════════════════════════════════════════
@@ -1484,8 +1475,9 @@ class GithubGenerator:
                     logger(f"✗ Flow failed, preparing retry ({attempt + 1}/{max_retries})...", level=level + 1)
                     if self.use_tor_in_browser:
                         logger("🔄 Renewing Tor connection...", level=level + 1)
-                        all_ips = self.ip_manager.get_ips_list(level=level + 1)
-                        _, self.ip = renew_tor_ip_with_preferred_exit(preferred_ips=all_ips, level=level + 1)
+                        # all_ips = self.ip_manager.get_ips_list(level=level + 1)
+                        # _, self.ip = renew_tor_ip_with_preferred_exit(preferred_ips=all_ips, level=level + 1)
+                        renew_tor(level=level + 1)
                     wait_time = random.uniform(5, 10)
                     logger(f"⏳ Waiting {wait_time:.1f}s before next attempt...", level=level + 1)
                     time.sleep(wait_time)
@@ -1501,8 +1493,9 @@ class GithubGenerator:
                     logger(f"   Preparing retry ({attempt + 1}/{max_retries})...", level=level + 1)
                     if self.use_tor_in_browser:
                         logger("🔄 Renewing Tor connection...", level=level + 1)
-                        all_ips = self.ip_manager.get_ips_list(level=level + 1)
-                        _, self.ip = renew_tor_ip_with_preferred_exit(preferred_ips=all_ips, level=level + 1)
+                        # all_ips = self.ip_manager.get_ips_list(level=level + 1)
+                        # _, self.ip = renew_tor_ip_with_preferred_exit(preferred_ips=all_ips, level=level + 1)
+                        renew_tor(level=level + 1)
                     wait_time = random.uniform(5, 10)
                     logger(f"⏳ Waiting {wait_time:.1f}s before next attempt...", level=level + 1)
                     time.sleep(wait_time)
