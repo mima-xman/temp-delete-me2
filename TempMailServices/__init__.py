@@ -2,12 +2,13 @@
 TempMailServices - Collection of temporary email service integrations.
 
 Available services:
-- EmailOnDeck: emailondeck.com API
-- MailTM: mail.tm API
-- SmailPro: smailpro.com API
-- TempMailIO: temp-mail.io API
-- TempMailOrg: temp-mail.org API
-- TMailor: tmailor.com API
+- EmailOnDeck       : emailondeck.com API
+- MailTM            : mail.tm API
+- SmailPro          : smailpro.com API
+- TempMailIO        : temp-mail.io API
+- TempMailOrg       : temp-mail.org API
+- TMailor           : tmailor.com API
+- TenMinuteMail      : 10minutemail.com API
 
 All services share a common interface:
 - generate_email() -> dict with 'email' and 'token' keys
@@ -22,6 +23,7 @@ from .SmailPro import SmailPro
 from .TempMailIO import TempMailIO
 from .TempMailOrg import TempMailOrg
 from .TMailor import TMailor
+from .TenMinuteMail import TenMinuteMail
 
 __all__ = [
     'EmailOnDeck',
@@ -30,4 +32,5 @@ __all__ = [
     'TempMailIO',
     'TempMailOrg',
     'TMailor',
+    'TenMinuteMail',
 ]

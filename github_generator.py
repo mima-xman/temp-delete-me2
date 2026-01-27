@@ -30,7 +30,7 @@ from playwright_helper import PlaywrightHelper
 from database import DatabaseManager
 from github_username_manager import GitHubUsernameManager  # <-- NEW IMPORT
 from ip_manager import IPManager
-from TempMailServices import EmailOnDeck, MailTM, SmailPro, TempMailIO, TempMailOrg, TMailor
+from TempMailServices import EmailOnDeck, MailTM, SmailPro, TempMailIO, TempMailOrg, TMailor, TenMinuteMail
 from utils import format_error, get_2fa_code, logger, renew_tor, mask, renew_tor_ip_with_preferred_exit, get_current_ip
 
 from fake_useragent import UserAgent
@@ -355,6 +355,8 @@ class GithubGenerator:
                 self.email_service = TempMailOrg(use_tor=self.use_tor_in_mailservice)
             elif EMAIL_SERVICE_NAME == "TMailor":
                 self.email_service = TMailor(use_tor=self.use_tor_in_mailservice)
+            elif EMAIL_SERVICE_NAME == "TenMinuteMail":
+                self.email_service = TenMinuteMail(use_tor=self.use_tor_in_mailservice)
             else:
                 logger(f"✗ Invalid email service name: {EMAIL_SERVICE_NAME}", level=level + 1)
                 logger(f"✓ Using email service: EmailOnDeck", level=level + 1)
