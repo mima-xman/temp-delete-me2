@@ -25,6 +25,7 @@ on:
           - TempMailIO
           - TempMailOrg
           - TMailor
+          - TenMinuteMail
       use_tor_in_browser:
         description: 'Use TOR in browser'
         required: true
